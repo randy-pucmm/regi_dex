@@ -46,3 +46,17 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Documentación: solo se versionan los documentos finales y las imágenes.
+# Fuentes (Markdown, Mermaid, HTML), herramientas y documentación interna
+# (división de tareas, tickets, scripts) quedan fuera del repositorio.
+/docs/**
+!/docs/**/
+!/docs/**/*.pdf
+!/docs/**/*.png
+!/docs/**/*.svg
+!/docs/**/*.jpg
+/docs/src/
+/docs/internal/
+/docs/tools/
+/docs/diagrams/src/
