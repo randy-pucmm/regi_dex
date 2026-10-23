@@ -28,7 +28,7 @@ Las secciones marcadas como *planificado* describen el diseño acordado y se act
 | Documento | Contenido |
 |---|---|
 | [Especificación de Requisitos (SRS)](docs/SRS_RegiDex.pdf) | Alcance, requisitos funcionales y no funcionales, casos de uso, criterios de aceptación y trazabilidad. |
-| [Documento de Arquitectura](docs/Arquitectura_RegiDex.pdf) | Offline-First, persistencia y sincronización, GraphQL, conectividad, sistema de diseño Regi y **ADRs**. |
+| [Documento de Arquitectura](docs/Arquitectura_RegiDex.pdf) | Offline-First, persistencia y sincronización, GraphQL, conectividad, sistema de diseño Regi, **ADRs** y los 18 diagramas del proyecto (secuencias, modelo de datos, navegación…). |
 | [Enunciado del Proyecto Final](docs/project/) | Requisitos oficiales de la asignatura. |
 
 ---
@@ -100,6 +100,8 @@ Clean Architecture **por funcionalidades**: `presentation` → `domain` ← `dat
 - La UI **solo observa la base local**.
 - La red alimenta la base a través del coordinador de sincronización.
 
+![Contexto del sistema](docs/diagrams/D01_contexto.png)
+
 ![Arquitectura por capas](docs/diagrams/D03_arquitectura_capas.png)
 
 ## 6. Estructura del proyecto
@@ -114,8 +116,6 @@ lib/
 └── l10n/       # app_es.arb · app_en.arb
 ```
 
-![Estructura del proyecto](docs/diagrams/D04_estructura_proyecto.png)
-
 ## 7. Estrategia Offline-First
 
 - **Lecturas:** la UI siempre lee de la base local (Drift/SQLite).
@@ -123,9 +123,7 @@ lib/
 - **Errores:** un fallo remoto nunca borra datos válidos.
 - **Primera ejecución:** la app abre de inmediato y el catálogo llega por lotes en segundo plano.
 
-![Flujo Online/Offline](docs/diagrams/D05_flujo_online_offline.png)
-
-![Secuencia de consulta y recuperación](docs/diagrams/D06_secuencia_consulta.png)
+El flujo completo y la secuencia de consulta están en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§3).
 
 ## 8. GraphQL y estrategia de paginación
 
@@ -153,10 +151,6 @@ lib/
 | Interrupciones | Cada lote es una transacción con su avance en `sync_metadata`; se reanuda desde el último lote confirmado. |
 | Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI; **el remoto gana**. Los datos del usuario nunca se tocan. |
 
-![Sincronización paginada](docs/diagrams/D13_secuencia_sync_paginada.png)
-
-![Detección y restauración de datos alterados](docs/diagrams/D14_secuencia_integridad.png)
-
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
 
 ## 10. Persistencia local
@@ -169,15 +163,7 @@ Las **imágenes no se guardan en la base de datos**:
 - Se usa una caché de archivos LRU de 150 MB.
 - Los favoritos quedan fijados para uso offline (ADR-004).
 
-![Modelo de datos: catálogo](docs/diagrams/D09_er_catalogo.png)
-
-![Modelo de datos: detalle](docs/diagrams/D10_er_catalogo_detalle.png)
-
-![Modelo de datos: usuario y sincronización](docs/diagrams/D11_er_usuario_sync.png)
-
-![Modelo de datos: Champions y equipos](docs/diagrams/D12_er_champions.png)
-
-![Política de imágenes](docs/diagrams/D15_flujo_imagenes.png)
+El modelo de datos completo (diagramas ER) y la política de imágenes están en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§5).
 
 ## 11. Gestión de conectividad
 
@@ -213,8 +199,6 @@ El estado del servicio se decide con un **health-check real contra PokéAPI**, n
 
 ![Temas Regi](docs/assets/M02_temas_regi.png)
 
-![Secuencia del Team Builder](docs/diagrams/D16_secuencia_team_builder.png)
-
 ## 13. Limitaciones conocidas
 
 - **Límite de PokéAPI** de 100 llamadas por hora por IP. El refresco periódico puede posponerse para no superarlo.
@@ -242,33 +226,6 @@ El texto completo de cada ADR (contexto, decisión, alternativas y consecuencias
 | ADR-009 | Sistema de diseño Regi sobre Material 3 | Rafael |
 | ADR-010 | Simulador de caída de API e inspector de BD | Rafael |
 | ADR-011 | Internacionalización con ARB (es/en) | Rafael |
-
-## Diagramas
-
-| ID | Diagrama |
-|---|---|
-| D01 | [Contexto del sistema](docs/diagrams/D01_contexto.png) |
-| D02 | [Casos de uso](docs/diagrams/D02_casos_de_uso.png) |
-| D03 | [Arquitectura por capas](docs/diagrams/D03_arquitectura_capas.png) |
-| D04 | [Estructura del proyecto](docs/diagrams/D04_estructura_proyecto.png) |
-| D05 | [Flujo Online/Offline](docs/diagrams/D05_flujo_online_offline.png) |
-| D06 | [Secuencia de consulta](docs/diagrams/D06_secuencia_consulta.png) |
-| D07 | [Estados de conectividad](docs/diagrams/D07_estados_conectividad.png) |
-| D08 | [Estados de sincronización](docs/diagrams/D08_estados_sync.png) |
-| D09 | [ER: catálogo](docs/diagrams/D09_er_catalogo.png) |
-| D10 | [ER: detalle del catálogo](docs/diagrams/D10_er_catalogo_detalle.png) |
-| D11 | [ER: usuario y sincronización](docs/diagrams/D11_er_usuario_sync.png) |
-| D12 | [ER: Champions y equipos](docs/diagrams/D12_er_champions.png) |
-| D13 | [Sincronización paginada](docs/diagrams/D13_secuencia_sync_paginada.png) |
-| D14 | [Integridad de datos](docs/diagrams/D14_secuencia_integridad.png) |
-| D15 | [Política de imágenes](docs/diagrams/D15_flujo_imagenes.png) |
-| D16 | [Team Builder](docs/diagrams/D16_secuencia_team_builder.png) |
-| D17 | [Navegación](docs/diagrams/D17_navegacion.png) |
-| D18 | [Cronograma](docs/diagrams/D18_cronograma.png) |
-
-![Casos de uso](docs/diagrams/D02_casos_de_uso.png)
-
-![Navegación](docs/diagrams/D17_navegacion.png)
 
 ## Cronograma
 
