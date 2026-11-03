@@ -87,7 +87,7 @@ flutter run
 | `graphql` | Cliente GraphQL | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
 | `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
 | `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
-| `go_router` | Navegación | Rutas declarativas y shell con pestañas. |
+| `go_router` | Navegación | Rutas declarativas: pantalla de Inicio con los cinco destinos del rediseño y un shell común. |
 | `freezed` + `json_serializable` | Modelos | Entidades inmutables, estados sellados y DTOs. |
 | `crypto` | Integridad | `content_hash` para detectar datos alterados (ADR-006). |
 | `fl_chart` · `share_plus` · `intl` | UI | Gráfico de estadísticas, compartir, i18n es/en. |
