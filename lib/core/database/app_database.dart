@@ -1,6 +1,12 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
+import 'daos/api_call_log_dao.dart';
+import 'daos/catalog_dao.dart';
+import 'daos/favorite_dao.dart';
+import 'daos/preference_dao.dart';
+import 'daos/reference_dao.dart';
+import 'daos/sync_metadata_dao.dart';
 import 'tables/catalog_tables.dart';
 import 'tables/reference_tables.dart';
 import 'tables/sync_tables.dart';
@@ -29,6 +35,14 @@ part 'app_database.g.dart';
     UserPreferences,
     SyncMetadataEntries,
     ApiCallLogs,
+  ],
+  daos: [
+    CatalogDao,
+    ReferenceDao,
+    FavoriteDao,
+    PreferenceDao,
+    SyncMetadataDao,
+    ApiCallLogDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
