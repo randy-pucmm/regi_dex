@@ -60,3 +60,6 @@ app.*.map.json
 /docs/internal/
 /docs/tools/
 /docs/diagrams/src/
+
+# Código generado por build_runner (dart run build_runner build).
+*.g.dart

@@ -74,7 +74,7 @@ Todo funciona **con o sin conexión**: la interfaz siempre se construye desde la
 git clone git@github.com:randy-pucmm/regi_dex.git
 cd regi_dex
 flutter pub get
-dart run build_runner build --delete-conflicting-outputs   # planificado: Drift, Freezed y JSON
+dart run build_runner build   # genera el código de Drift (los *.g.dart no se versionan)
 flutter run
 ```
 
@@ -83,7 +83,7 @@ flutter run
 | Paquete | Uso | Justificación |
 |---|---|---|
 | `flutter_riverpod` | Estado e inyección de dependencias | Providers testeables y sustituibles; encaja con los streams de Drift (ADR-002). |
-| `drift` + `sqlite3_flutter_libs` | Persistencia local | SQL tipado, consultas reactivas, transacciones y migraciones (ADR-001). |
+| `drift` + `drift_flutter` | Persistencia local | SQL tipado, consultas reactivas, transacciones y migraciones (ADR-001). |
 | `graphql` | Cliente GraphQL | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
 | `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
 | `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
