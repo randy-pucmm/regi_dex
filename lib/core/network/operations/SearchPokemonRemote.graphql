@@ -1,0 +1,12 @@
+# Respaldo online de la búsqueda: solo se usa cuando el término no existe en la
+# base local y el servicio está disponible. El resultado se persiste antes de
+# mostrarse (la UI nunca consume esta respuesta directamente).
+query SearchPokemonRemote($pattern: String!, $limit: Int!) {
+  pokemon(
+    where: { is_default: { _eq: true }, name: { _ilike: $pattern } }
+    order_by: { id: asc }
+    limit: $limit
+  ) {
+    ...PokemonLight
+  }
+}

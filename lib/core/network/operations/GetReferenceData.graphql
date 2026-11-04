@@ -1,0 +1,53 @@
+# Datos de referencia (1 sola llamada): tipos, generaciones, grupos huevo,
+# tabla de eficacias, version groups, habilidades, movimientos y el total de
+# Pokémon por defecto (para saber si el catálogo local está completo).
+query GetReferenceData($langs: [String!]!) {
+  type(where: { id: { _lt: 10000 } }, order_by: { id: asc }) {
+    id
+    name
+    typenames(where: { language: { name: { _in: $langs } } }) {
+      name
+      language { name }
+    }
+  }
+  generation(order_by: { id: asc }) {
+    id
+    name
+    region { name }
+  }
+  egggroup(order_by: { id: asc }) {
+    id
+    name
+    egggroupnames(where: { language: { name: { _in: $langs } } }) {
+      name
+      language { name }
+    }
+  }
+  typeefficacy {
+    damage_type_id
+    target_type_id
+    damage_factor
+  }
+  versiongroup(order_by: { order: asc }) {
+    id
+    name
+    generation_id
+  }
+  ability(where: { is_main_series: { _eq: true } }, order_by: { id: asc }) {
+    id
+    name
+  }
+  move(order_by: { id: asc }) {
+    id
+    name
+    type_id
+    power
+    accuracy
+    pp
+    priority
+    move_damage_class_id
+  }
+  pokemon_aggregate(where: { is_default: { _eq: true } }) {
+    aggregate { count }
+  }
+}

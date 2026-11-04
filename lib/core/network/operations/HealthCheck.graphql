@@ -1,0 +1,7 @@
+# Comprobación de salud: confirma que el motor GraphQL y la base de datos de
+# PokéAPI responden. Respuesta mínima (un id) para no gastar ancho de banda.
+query HealthCheck {
+  pokemon(limit: 1) {
+    id
+  }
+}
