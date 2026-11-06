@@ -45,8 +45,11 @@ class SyncCoordinator {
     final existing = _inFlight[resourceKey];
     if (existing != null) return existing as Future<T>;
 
-    final future = _execute(action)
-        .whenComplete(() => _inFlight.remove(resourceKey));
+    final future = _execute(action).whenComplete(() {
+      // Con bloque: devolver el resultado de `remove` haría que el Future
+      // esperara a sí mismo.
+      _inFlight.remove(resourceKey);
+    });
     _inFlight[resourceKey] = future;
     return future;
   }
