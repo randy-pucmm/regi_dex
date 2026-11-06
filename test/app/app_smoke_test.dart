@@ -2,9 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/app.dart';
+import 'package:regi_dex/app/providers.dart';
+
+import '../core/connectivity/connectivity_fakes.dart';
 
 Future<void> _pumpApp(WidgetTester tester) async {
-  await tester.pumpWidget(const ProviderScope(child: RegiDexApp()));
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        networkSourceProvider.overrideWithValue(FakeNetworkSource()),
+        healthCheckerProvider.overrideWithValue(FakeHealthChecker()),
+      ],
+      child: const RegiDexApp(),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 

@@ -1,5 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/connectivity/connectivity_monitor.dart';
+import '../core/connectivity/health_checker.dart';
+import '../core/connectivity/network_source.dart';
+import '../core/connectivity/service_status.dart';
 import '../core/database/app_database.dart';
 import '../core/network/operation_loader.dart';
 import '../core/network/poke_api_client.dart';
@@ -38,3 +44,30 @@ final pokeApiClientProvider = Provider<PokeApiClient>((ref) {
   ref.onDispose(client.dispose);
   return client;
 });
+
+/// Eventos de red del dispositivo (`connectivity_plus`).
+final networkSourceProvider = Provider<NetworkSource>(
+  (ref) => ConnectivityPlusNetworkSource(),
+);
+
+/// Health-check contra PokéAPI.
+final healthCheckerProvider = Provider<HealthChecker>(
+  (ref) => GraphqlHealthChecker(ref.watch(pokeApiClientProvider)),
+);
+
+/// Monitor de conectividad, activo mientras exista el provider.
+final connectivityMonitorProvider = Provider<ConnectivityMonitor>((ref) {
+  final monitor = ConnectivityMonitor(
+    network: ref.watch(networkSourceProvider),
+    healthChecker: ref.watch(healthCheckerProvider),
+    calls: ref.watch(pokeApiClientProvider).calls,
+  );
+  unawaited(monitor.start());
+  ref.onDispose(monitor.dispose);
+  return monitor;
+});
+
+/// Estado de conectividad para el indicador global.
+final serviceStatusProvider = StreamProvider<ConnectivitySnapshot>(
+  (ref) => ref.watch(connectivityMonitorProvider).snapshots,
+);
