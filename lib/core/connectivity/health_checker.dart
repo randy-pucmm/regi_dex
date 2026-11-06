@@ -6,7 +6,8 @@ import '../network/poke_api_config.dart';
 /// Confirma que PokéAPI responde de verdad (OF-11).
 abstract interface class HealthChecker {
   /// Termina sin error si el servicio respondió; si no, lanza un [Failure].
-  Future<void> check();
+  /// [attempt] identifica el intento en el registro de consola.
+  Future<void> check({int attempt = 1});
 }
 
 /// Health-check con la consulta `HealthCheck` (un id, 31 bytes) y un timeout
@@ -17,10 +18,11 @@ class GraphqlHealthChecker implements HealthChecker {
   final PokeApiClient _client;
 
   @override
-  Future<void> check() async {
+  Future<void> check({int attempt = 1}) async {
     final data = await _client.execute(
       GraphqlOperation.healthCheck,
       timeout: healthCheckTimeout,
+      attempt: attempt,
     );
     final pokemon = data['pokemon'];
     if (pokemon is! List || pokemon.isEmpty) {
