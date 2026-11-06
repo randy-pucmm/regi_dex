@@ -41,6 +41,14 @@ final class RateLimitFailure extends Failure {
   final Duration retryAfter;
 }
 
+/// El presupuesto local de llamadas (ADR-005) se agotó: la llamada ni siquiera
+/// salió. No dice nada del servicio. [retryAfter] es lo que falta para tener cupo.
+final class BudgetExhaustedFailure extends Failure {
+  const BudgetExhaustedFailure(super.message, {required this.retryAfter});
+
+  final Duration retryAfter;
+}
+
 /// El servidor falló o no es utilizable (HTTP 5xx, endpoint inexistente,
 /// respuesta ilegible). [statusCode] es el estado HTTP, si se conoce.
 final class ServiceUnavailableFailure extends Failure {

@@ -197,9 +197,9 @@ class ConnectivityMonitor {
   }
 
   void _handleFailure(Failure failure) {
+    _armIdleTimer();
     final status = _classify(failure);
     if (status == null) return;
-    _armIdleTimer();
     _lastFailure = failure;
     _lastCheckAt = clock.now();
     _propose(status);
@@ -212,7 +212,8 @@ class ConnectivityMonitor {
   }
 
   /// Estado de servicio que implica [failure], o null si no habla del servicio
-  /// (un DTO inválido o una consulta mal formada no lo cambian).
+  /// (un DTO inválido, una consulta mal formada o el presupuesto local agotado
+  /// no lo cambian).
   ServiceStatus? _classify(Failure failure) {
     if (!_network.hasInterface) return ServiceStatus.offline;
     return switch (failure) {
@@ -221,7 +222,10 @@ class ConnectivityMonitor {
       ServiceUnavailableFailure() ||
       RateLimitFailure() => ServiceStatus.servicioNoDisponible,
       GraphQLFailure(isValidation: false) => ServiceStatus.servicioNoDisponible,
-      GraphQLFailure() || PartialDataFailure() || ValidationFailure() => null,
+      GraphQLFailure() ||
+      PartialDataFailure() ||
+      ValidationFailure() ||
+      BudgetExhaustedFailure() => null,
     };
   }
 
