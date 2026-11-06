@@ -85,7 +85,9 @@ flutter run
 | `flutter_riverpod` | Estado e inyección de dependencias | Providers testeables y sustituibles; encaja con los streams de Drift (ADR-002). |
 | `drift` + `drift_flutter` | Persistencia local | SQL tipado, consultas reactivas, transacciones y migraciones (ADR-001). |
 | `graphql` | Cliente GraphQL | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
+| `http` | Transporte HTTP | Cliente del enlace GraphQL: fija el timeout de conexión y permite simular el servidor en las pruebas. |
 | `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
+| `clock` · `fake_async` (dev) | Reloj | Reloj inyectable y reloj falso para probar la histéresis y los reintentos sin esperas reales. |
 | `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
 | `go_router` | Navegación | Rutas declarativas: pantalla de Inicio con los cinco destinos del rediseño y un shell común. |
 | `freezed` + `json_serializable` | Modelos | Entidades inmutables, estados sellados y DTOs. |
@@ -127,7 +129,9 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 
 ## 8. GraphQL y estrategia de paginación
 
-- **Endpoint:** `https://graphql.pokeapi.co/v1beta2` (solo POST).
+- **Endpoint:** `https://graphql.pokeapi.co/v1beta2` (solo POST). Es configurable por provider (`pokeApiEndpointProvider`) o con `--dart-define=POKEAPI_ENDPOINT=<url>`.
+- **Cliente:** sin caché (`FetchPolicy.noCache`), con timeout de conexión de 5 s y de respuesta de 10 s. Cada operación se registra en consola (nombre, duración e intento) y los errores se traducen a `Failure`.
+- **Operaciones:** viven como archivos `.graphql` en `lib/core/network/operations/`.
 - **Límite: 100 llamadas por hora por IP.** Por eso trabajamos con un presupuesto de ≤ 90 llamadas/h (ADR-005).
 - **Paginación:** `limit/offset` ordenada por `id` sobre los 1025 Pokémon por defecto, en **lotes de 200**. El catálogo completo cuesta 6 llamadas y los datos de referencia 1.
 - **Validación:** todas las consultas se validaron contra el servicio real el 23-oct-2026 y están documentadas en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§6).
@@ -147,6 +151,7 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 |---|---|
 | Disparadores | Inicio, reconexión, abrir un detalle, cada 30 min y manual («Sincronizar ahora»). |
 | Concurrencia | *Single-flight* por recurso. |
+| Presupuesto | Máximo 90 llamadas por ventana móvil de 60 min, registradas en `api_call_log` (también cuentan los health-check). Si se agota, la llamada no sale y el estado del servicio no cambia. |
 | Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ, tope de 60 s, máximo 5 intentos. |
 | Interrupciones | Cada lote es una transacción con su avance en `sync_metadata`; se reanuda desde el último lote confirmado. |
 | Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI; **el remoto gana**. Los datos del usuario nunca se tocan. |
@@ -180,10 +185,13 @@ El estado del servicio se decide con un **health-check real contra PokéAPI**, n
 
 **Comportamiento.**
 
-- Una histéresis de 1.5 s evita parpadeos.
+- Una histéresis de 1.5 s evita parpadeos. Mientras se verifica se conserva el último estado estable.
+- El ping se envía al cambiar la red, al reintentar tras una caída (2 s × 2 con jitter, hasta 5 intentos) y tras 10 min sin tráfico. Una consulta exitosa cuenta como health-check.
 - Al tocar el LED se ve el detalle: red, API, origen y hora de los datos, y próximo reintento.
 
 **Herramientas para la demo.** Ajustes → Depuración → **Simular API caída** permite demostrar PA-08 con la red activa.
+
+También se puede probar desde la consola: `flutter run --dart-define=POKEAPI_ENDPOINT=https://graphql.pokeapi.co/__regidex_down__` deja la red activa y la API sin respuesta.
 
 ![Estados de conectividad](docs/diagrams/D07_estados_conectividad.png)
 

@@ -1,0 +1,7 @@
+# Verificación de integridad (OF-19/20): trae la versión remota de un lote de
+# filas del catálogo para compararla con la local y restaurarla si difiere.
+query GetPokemonsByIds($ids: [Int!]!) {
+  pokemon(where: { id: { _in: $ids } }, order_by: { id: asc }) {
+    ...PokemonLight
+  }
+}

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/app.dart';
-import 'package:regi_dex/ui/components/hub_buttons.dart';
+import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/features/settings/presentation/settings_dialog.dart';
 import 'package:regi_dex/ui/components/hex_choice.dart';
+import 'package:regi_dex/ui/components/hub_buttons.dart';
 import 'package:regi_dex/ui/components/pokedex_shell.dart';
 import 'package:regi_dex/ui/themes/regi_theme.dart';
 import 'package:regi_dex/ui/tokens/regi_palette.dart';
+
+import '../core/connectivity/connectivity_fakes.dart';
 
 /// Destinos de Inicio que abren una pantalla (Ajustes abre una ventana).
 const _screens = ['Catálogo', 'Favoritos', 'Equipos', 'Trivia'];
@@ -22,7 +25,15 @@ Future<void> _pumpApp(
   tester.platformDispatcher.textScaleFactorTestValue = textScale;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  await tester.pumpWidget(const ProviderScope(child: RegiDexApp()));
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        networkSourceProvider.overrideWithValue(FakeNetworkSource()),
+        healthCheckerProvider.overrideWithValue(FakeHealthChecker()),
+      ],
+      child: const RegiDexApp(),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 

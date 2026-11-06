@@ -1,0 +1,77 @@
+# Detalle completo bajo demanda en UNA llamada: identidad, stats, habilidades,
+# movimientos (solo ids; los datos del movimiento vienen de GetReferenceData),
+# especie, formas/variantes, sprites y cadena evolutiva.
+query GetPokemonDetail($id: Int!, $langs: [String!]!) {
+  pokemon(where: { id: { _eq: $id } }) {
+    id
+    name
+    height
+    weight
+    is_default
+    pokemontypes(order_by: { slot: asc }) { slot type_id }
+    pokemonstats { stat_id base_stat }
+    pokemonabilities(order_by: { slot: asc }) {
+      is_hidden
+      slot
+      ability {
+        id
+        name
+        abilitynames(where: { language: { name: { _in: $langs } } }) {
+          name
+          language { name }
+        }
+        abilityeffecttexts(where: { language: { name: { _in: $langs } } }) {
+          short_effect
+          language { name }
+        }
+      }
+    }
+    pokemonmoves {
+      move_id
+      level
+      move_learn_method_id
+      version_group_id
+    }
+    pokemonsprites {
+      front: sprites(path: "front_default")
+      front_shiny: sprites(path: "front_shiny")
+      artwork: sprites(path: "other['official-artwork'].front_default")
+      artwork_shiny: sprites(path: "other['official-artwork'].front_shiny")
+    }
+    pokemonspecy {
+      id
+      name
+      generation_id
+      is_legendary
+      is_mythical
+      pokemonegggroups { egg_group_id }
+      pokemonspeciesnames(where: { language: { name: { _in: $langs } } }) {
+        name
+        genus
+        language { name }
+      }
+      pokemons(order_by: { id: asc }) {
+        id
+        name
+        is_default
+        pokemonforms { form_name is_mega }
+        pokemontypes(order_by: { slot: asc }) { slot type_id }
+      }
+      evolutionchain {
+        id
+        pokemonspecies(order_by: { order: asc }) {
+          id
+          name
+          evolves_from_species_id
+          pokemonevolutions {
+            min_level
+            min_happiness
+            time_of_day
+            evolutiontrigger { name }
+            item { name }
+          }
+        }
+      }
+    }
+  }
+}

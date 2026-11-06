@@ -1,0 +1,22 @@
+# Fragmento compartido por GetPokemonPage, GetPokemonsByIds y SearchPokemonRemote.
+fragment PokemonLight on pokemon {
+  id
+  name
+  height
+  weight
+  pokemon_species_id
+  pokemonspecy {
+    generation_id
+    evolution_chain_id
+    is_legendary
+    is_mythical
+    pokemonegggroups { egg_group_id }
+  }
+  pokemontypes(order_by: { slot: asc }) { slot type_id }
+  pokemonabilities(order_by: { slot: asc }) { ability_id is_hidden slot }
+  pokemonstats { stat_id base_stat }
+  pokemonsprites {
+    front: sprites(path: "front_default")
+    artwork: sprites(path: "other['official-artwork'].front_default")
+  }
+}
