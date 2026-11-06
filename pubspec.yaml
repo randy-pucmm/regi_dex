@@ -45,6 +45,10 @@ dependencies:
   drift: 2.35.3
   drift_flutter: 0.3.1
 
+  # Cliente GraphQL de PokéAPI (ADR-003) y su transporte HTTP.
+  graphql: 5.2.4
+  http: 1.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -70,6 +74,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Operaciones GraphQL de PokéAPI.
+  assets:
+    - lib/core/network/operations/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

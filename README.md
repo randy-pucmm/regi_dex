@@ -85,6 +85,7 @@ flutter run
 | `flutter_riverpod` | Estado e inyección de dependencias | Providers testeables y sustituibles; encaja con los streams de Drift (ADR-002). |
 | `drift` + `drift_flutter` | Persistencia local | SQL tipado, consultas reactivas, transacciones y migraciones (ADR-001). |
 | `graphql` | Cliente GraphQL | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
+| `http` | Transporte HTTP | Cliente del enlace GraphQL: fija el timeout de conexión y permite simular el servidor en las pruebas. |
 | `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
 | `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
 | `go_router` | Navegación | Rutas declarativas: pantalla de Inicio con los cinco destinos del rediseño y un shell común. |
@@ -127,7 +128,9 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 
 ## 8. GraphQL y estrategia de paginación
 
-- **Endpoint:** `https://graphql.pokeapi.co/v1beta2` (solo POST).
+- **Endpoint:** `https://graphql.pokeapi.co/v1beta2` (solo POST). Es configurable por provider (`pokeApiEndpointProvider`) o con `--dart-define=POKEAPI_ENDPOINT=<url>`.
+- **Cliente:** sin caché (`FetchPolicy.noCache`), con timeout de conexión de 5 s y de respuesta de 10 s. Cada operación se registra en consola (nombre, duración e intento) y los errores se traducen a `Failure`.
+- **Operaciones:** viven como archivos `.graphql` en `lib/core/network/operations/`.
 - **Límite: 100 llamadas por hora por IP.** Por eso trabajamos con un presupuesto de ≤ 90 llamadas/h (ADR-005).
 - **Paginación:** `limit/offset` ordenada por `id` sobre los 1025 Pokémon por defecto, en **lotes de 200**. El catálogo completo cuesta 6 llamadas y los datos de referencia 1.
 - **Validación:** todas las consultas se validaron contra el servicio real el 23-oct-2026 y están documentadas en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§6).

@@ -1,0 +1,12 @@
+# Página del catálogo ligero (paginación offset/limit ordenada por id).
+# Solo los campos que necesitan la lista, la búsqueda, los filtros y el orden.
+query GetPokemonPage($limit: Int!, $offset: Int!) {
+  pokemon(
+    where: { is_default: { _eq: true } }
+    order_by: { id: asc }
+    limit: $limit
+    offset: $offset
+  ) {
+    ...PokemonLight
+  }
+}
