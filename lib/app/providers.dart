@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/connectivity/budgeted_health_checker.dart';
 import '../core/connectivity/connectivity_monitor.dart';
 import '../core/connectivity/health_checker.dart';
 import '../core/connectivity/network_source.dart';
@@ -10,6 +11,9 @@ import '../core/database/app_database.dart';
 import '../core/network/operation_loader.dart';
 import '../core/network/poke_api_client.dart';
 import '../core/network/poke_api_config.dart';
+import '../core/sync/api_budget.dart';
+import '../core/sync/sync_coordinator.dart';
+import '../core/sync/sync_status.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
 /// con una base en memoria.
@@ -50,9 +54,17 @@ final networkSourceProvider = Provider<NetworkSource>(
   (ref) => ConnectivityPlusNetworkSource(),
 );
 
-/// Health-check contra PokéAPI.
+/// Presupuesto de llamadas a PokéAPI (90 por ventana móvil de 60 min).
+final apiBudgetProvider = Provider<ApiBudget>(
+  (ref) => ApiBudget(log: ref.watch(appDatabaseProvider).apiCallLogDao),
+);
+
+/// Health-check contra PokéAPI, dentro del presupuesto de llamadas.
 final healthCheckerProvider = Provider<HealthChecker>(
-  (ref) => GraphqlHealthChecker(ref.watch(pokeApiClientProvider)),
+  (ref) => BudgetedHealthChecker(
+    inner: GraphqlHealthChecker(ref.watch(pokeApiClientProvider)),
+    budget: ref.watch(apiBudgetProvider),
+  ),
 );
 
 /// Monitor de conectividad, activo mientras exista el provider.
@@ -70,4 +82,18 @@ final connectivityMonitorProvider = Provider<ConnectivityMonitor>((ref) {
 /// Estado de conectividad para el indicador global.
 final serviceStatusProvider = StreamProvider<ConnectivitySnapshot>(
   (ref) => ref.watch(connectivityMonitorProvider).snapshots,
+);
+
+/// Coordinador de sincronizaciones: single-flight por recurso y `sync_metadata`.
+final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
+  final coordinator = SyncCoordinator(
+    metadata: ref.watch(appDatabaseProvider).syncMetadataDao,
+  );
+  ref.onDispose(coordinator.dispose);
+  return coordinator;
+});
+
+/// Estado de la sincronización para el indicador global.
+final syncStatusProvider = StreamProvider<SyncStatus>(
+  (ref) => ref.watch(syncCoordinatorProvider).statuses,
 );

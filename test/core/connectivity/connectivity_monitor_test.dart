@@ -480,6 +480,27 @@ void main() {
       });
     });
 
+    test('un ping bloqueado por el presupuesto no cambia el estado y se reintenta a los 10 min', () {
+      fakeAsync((async) {
+        final h = _Harness();
+        h.start(async);
+
+        h.checker.failure = const BudgetExhaustedFailure(
+          'presupuesto agotado',
+          retryAfter: Duration(minutes: 20),
+        );
+        unawaited(h.monitor.checkNow());
+        async.elapse(const Duration(minutes: 9, seconds: 59));
+        expect(h.status, ServiceStatus.online);
+        expect(h.monitor.current.lastFailure, isNull);
+        expect(h.checker.calls, 2);
+
+        async.elapse(const Duration(seconds: 1));
+        expect(h.checker.calls, 3);
+        h.monitor.dispose();
+      });
+    });
+
     test('dos checkNow simultáneos comparten una sola verificación', () {
       fakeAsync((async) {
         final h = _Harness();
