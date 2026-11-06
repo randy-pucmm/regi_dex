@@ -31,6 +31,13 @@ abstract final class RegiInk {
   static const panelRaised = Color(0xFF1E2327);
 }
 
+/// Borde y texto de los botones de destino de Inicio; no cambian con el tema.
+abstract final class RegiHubColors {
+  static const favorites = Color(0xFFFFC53D);
+  static const trivia = Color(0xFF4DA3FF);
+  static const teams = Color(0xFF4ADE80);
+}
+
 /// Colores de las seis estadísticas base, por orden de PokéAPI.
 enum RegiStat {
   hp('PS', Color(0xFF4ADE80)),
