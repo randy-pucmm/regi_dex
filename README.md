@@ -151,6 +151,7 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 |---|---|
 | Disparadores | Inicio, reconexión, abrir un detalle, cada 30 min y manual («Sincronizar ahora»). |
 | Concurrencia | *Single-flight* por recurso. |
+| Presupuesto | Máximo 90 llamadas por ventana móvil de 60 min, registradas en `api_call_log` (también cuentan los health-check). Si se agota, la llamada no sale y el estado del servicio no cambia. |
 | Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ, tope de 60 s, máximo 5 intentos. |
 | Interrupciones | Cada lote es una transacción con su avance en `sync_metadata`; se reanuda desde el último lote confirmado. |
 | Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI; **el remoto gana**. Los datos del usuario nunca se tocan. |
