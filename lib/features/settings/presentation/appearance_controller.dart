@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../ui/themes/regi_themes.dart';
 import '../../../ui/tokens/regi_palette.dart';
 
-/// Tema Regi y modo (claro u oscuro) elegidos por el usuario.
+/// Tema Regi y modo elegidos por el usuario.
 @immutable
 class Appearance {
   const Appearance({
@@ -26,10 +26,7 @@ class Appearance {
   int get hashCode => Object.hash(variant, mode);
 }
 
-/// Estado de apariencia de la app.
-///
-/// TODO(RD-34): hoy vive solo en memoria; guardarlo con `PreferenceDao` para
-/// que persista entre sesiones (RF-TEM-03).
+// TODO(RD-34): guardarlo con `PreferenceDao` para que persista (RF-TEM-03).
 class AppearanceController extends Notifier<Appearance> {
   @override
   Appearance build() => const Appearance();

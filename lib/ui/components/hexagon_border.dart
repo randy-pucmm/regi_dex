@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Borde hexagonal de la Pokédex.
-///
-/// - [Axis.vertical]: vértices arriba y abajo (letras del título, celdas de
-///   estadísticas).
-/// - [Axis.horizontal]: vértices a izquierda y derecha, para bandas largas
-///   como la de estado de conexión.
-///
-/// [depth] es cuánto entra cada vértice; por defecto un cuarto del alto
-/// (vertical) o la mitad del alto (horizontal).
+/// Borde hexagonal. Con [Axis.vertical] los vértices quedan arriba y abajo; con
+/// [Axis.horizontal], a los lados. [depth] es cuánto entra cada vértice.
 class HexagonBorder extends OutlinedBorder {
   const HexagonBorder({super.side, this.pointAxis = Axis.vertical, this.depth});
 

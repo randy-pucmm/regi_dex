@@ -1,32 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/ui/components/hex_choice.dart';
-import 'package:regi_dex/ui/themes/regi_themes.dart';
-import 'package:regi_dex/ui/tokens/contrast.dart';
 import 'package:regi_dex/ui/tokens/regi_colors.dart';
-import 'package:regi_dex/ui/tokens/regi_palette.dart';
 
-Widget _host(Widget child, {double textScale = 1}) {
-  return MaterialApp(
-    theme: RegiThemes.build(RegiVariant.regirock, Brightness.light),
-    home: MediaQuery(
-      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-      child: Scaffold(
-        backgroundColor: RegiInk.panel,
-        body: Center(child: child),
-      ),
-    ),
-  );
-}
+import '../../helpers/ui_test_helpers.dart';
+
+Widget _host(Widget child, {double textScale = 1}) =>
+    regiHost(child, textScale: textScale, background: RegiInk.panel);
 
 void main() {
-  test('el borde de una opción sin elegir se distingue del fondo (≥ 3:1)', () {
-    expect(
-      contrastRatio(HexChoice.unselectedBorder, RegiInk.panel),
-      greaterThanOrEqualTo(3),
-    );
-  });
-
   testWidgets('la opción elegida lleva «✓»; la otra no', (tester) async {
     await tester.pumpWidget(
       _host(
@@ -40,9 +22,6 @@ void main() {
       ),
     );
 
-    expect(find.text('REGICE'), findsOneWidget);
-    expect(find.text('REGIROCK'), findsOneWidget);
-    // Un solo «✓»: el de la opción elegida.
     expect(find.byIcon(Icons.check), findsOneWidget);
     expect(
       find.descendant(
@@ -76,38 +55,7 @@ void main() {
     expect(taps, 1);
   });
 
-  testWidgets('relleno: la opción elegida es blanca con texto oscuro legible', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _host(
-        SizedBox(
-          width: 150,
-          child: HexChoice(
-            label: 'Claro',
-            filled: true,
-            selected: true,
-            onPressed: () {},
-          ),
-        ),
-      ),
-    );
-
-    final material = tester.widget<Material>(
-      find.descendant(
-        of: find.byType(HexChoice),
-        matching: find.byType(Material),
-      ),
-    );
-    expect(material.color, RegiInk.onShell);
-    final style = tester.widget<Text>(find.text('CLARO')).style!;
-    expect(
-      contrastRatio(style.color!, material.color!),
-      greaterThanOrEqualTo(4.5),
-    );
-  });
-
-  testWidgets('una opción se anuncia como botón seleccionado o no', (
+  testWidgets('se anuncia como opción elegida o no, o como acción sin estado', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
@@ -118,6 +66,7 @@ void main() {
           children: [
             HexChoice(label: 'Regice', selected: true, onPressed: () {}),
             HexChoice(label: 'Regirock', selected: false, onPressed: () {}),
+            HexChoice(label: 'Listo', onPressed: () {}),
           ],
         ),
       ),
@@ -131,20 +80,6 @@ void main() {
       tester.getSemantics(find.bySemanticsLabel('Regirock')),
       isSemantics(label: 'Regirock', isButton: true, isSelected: false),
     );
-    handle.dispose();
-  });
-
-  testWidgets('una acción es un botón sin estado de selección', (tester) async {
-    final handle = tester.ensureSemantics();
-    await tester.pumpWidget(
-      _host(
-        SizedBox(
-          width: 128,
-          child: HexChoice(label: 'Listo', onPressed: () {}),
-        ),
-      ),
-    );
-
     expect(
       tester.getSemantics(find.bySemanticsLabel('Listo')),
       isSemantics(

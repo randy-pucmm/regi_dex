@@ -4,11 +4,8 @@ import '../tokens/contrast.dart';
 import '../tokens/regi_colors.dart';
 import 'hexagon_border.dart';
 
-/// Botón hexagonal para las ventanas oscuras de la Pokédex.
-///
-/// Con [selected] es una opción de un grupo: la elegida lleva borde blanco y
-/// «✓» (con [filled], además fondo blanco), así que no depende solo del color.
-/// Sin [selected] es una acción (p. ej. «Listo»), con borde blanco.
+/// Botón hexagonal para las ventanas oscuras. Con [selected] es una opción de
+/// un grupo (la elegida lleva «✓», no solo color); sin él, una acción.
 class HexChoice extends StatelessWidget {
   const HexChoice({
     super.key,
@@ -27,13 +24,9 @@ class HexChoice extends StatelessWidget {
 
   /// La opción elegida se rellena de blanco.
   final bool filled;
-
-  /// Adorno antes del texto (p. ej. la muestra de color de un tema).
   final Widget? leading;
 
   static const _pointDepth = 16.0;
-
-  /// Borde de una opción sin elegir: gris que se distingue del fondo oscuro.
   static const unselectedBorder = Color(0xFF7C858B);
 
   @override

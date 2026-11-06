@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../themes/regi_theme.dart';
 
-/// Pantalla de la Pokédex: fondo del tema, borde con color de carcasa,
-/// bisel interior y la esquina inferior derecha redondeada.
+/// Pantalla de la Pokédex: solo la esquina inferior derecha va redondeada.
 class DexScreen extends StatelessWidget {
   const DexScreen({
     super.key,
@@ -14,7 +13,6 @@ class DexScreen extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
 
-  /// Radio de la esquina inferior redondeada.
   static const cornerRadius = 28.0;
 
   @override
@@ -30,7 +28,6 @@ class DexScreen extends StatelessWidget {
         border: Border.all(color: regi.frame, width: 2),
       ),
       child: DecoratedBox(
-        // Bisel: un segundo trazo tenue dentro del borde.
         decoration: BoxDecoration(
           borderRadius: corner,
           border: Border.all(

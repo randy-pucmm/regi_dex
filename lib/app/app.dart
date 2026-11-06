@@ -6,9 +6,8 @@ import '../ui/themes/regi_themes.dart';
 import 'providers.dart';
 import 'router.dart';
 
-/// Raíz de la aplicación: `MaterialApp.router` con el router del provider y el
-/// tema Regi y el modo que el usuario eligió en Ajustes.
-/// Mantiene vivo el monitor de conectividad mientras la app esté abierta.
+/// Raíz de la app. Mantiene vivo el monitor de conectividad mientras esté
+/// abierta.
 class RegiDexApp extends ConsumerWidget {
   const RegiDexApp({super.key});
 
