@@ -87,6 +87,7 @@ flutter run
 | `graphql` | Cliente GraphQL | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
 | `http` | Transporte HTTP | Cliente del enlace GraphQL: fija el timeout de conexión y permite simular el servidor en las pruebas. |
 | `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
+| `clock` · `fake_async` (dev) | Reloj | Reloj inyectable y reloj falso para probar la histéresis y los reintentos sin esperas reales. |
 | `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
 | `go_router` | Navegación | Rutas declarativas: pantalla de Inicio con los cinco destinos del rediseño y un shell común. |
 | `freezed` + `json_serializable` | Modelos | Entidades inmutables, estados sellados y DTOs. |
@@ -183,10 +184,13 @@ El estado del servicio se decide con un **health-check real contra PokéAPI**, n
 
 **Comportamiento.**
 
-- Una histéresis de 1.5 s evita parpadeos.
+- Una histéresis de 1.5 s evita parpadeos. Mientras se verifica se conserva el último estado estable.
+- El ping se envía al cambiar la red, al reintentar tras una caída (2 s × 2 con jitter, hasta 5 intentos) y tras 10 min sin tráfico. Una consulta exitosa cuenta como health-check.
 - Al tocar el LED se ve el detalle: red, API, origen y hora de los datos, y próximo reintento.
 
 **Herramientas para la demo.** Ajustes → Depuración → **Simular API caída** permite demostrar PA-08 con la red activa.
+
+También se puede probar desde la consola: `flutter run --dart-define=POKEAPI_ENDPOINT=https://graphql.pokeapi.co/__regidex_down__` deja la red activa y la API sin respuesta.
 
 ![Estados de conectividad](docs/diagrams/D07_estados_conectividad.png)
 
