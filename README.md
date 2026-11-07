@@ -88,6 +88,7 @@ flutter run
 | `http` | Transporte HTTP | Cliente del enlace GraphQL: fija el timeout de conexión y permite simular el servidor en las pruebas. |
 | `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
 | `clock` · `fake_async` (dev) | Reloj | Reloj inyectable y reloj falso para probar la histéresis y los reintentos sin esperas reales. |
+| `crypto` | Integridad | SHA-1 del `content_hash` de cada Pokémon (ADR-006). |
 | `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
 | `go_router` | Navegación | Rutas declarativas: pantalla de Inicio con los cinco destinos del rediseño y un shell común. |
 | `freezed` + `json_serializable` | Modelos | Entidades inmutables, estados sellados y DTOs. |
@@ -155,6 +156,15 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 | Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ, tope de 60 s, máximo 5 intentos. |
 | Interrupciones | Cada lote es una transacción con su avance en `sync_metadata`; se reanuda desde el último lote confirmado. |
 | Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI; **el remoto gana**. Los datos del usuario nunca se tocan. |
+
+**Sincronización del catálogo.** `CatalogSync` corre bajo el coordinador con la clave `catalog`:
+
+1. Pide los datos de referencia solo si faltan o tienen más de 30 días; el catálogo los necesita antes por las claves foráneas.
+2. Lee `cursor_offset` de `sync_metadata` y pide `GetPokemonPage` en lotes de 200 desde ahí, cada llamada dentro del presupuesto.
+3. Valida el lote, lo convierte a filas y calcula el `content_hash` (SHA-1) en un isolate, sin bloquear la interfaz.
+4. Guarda el lote y mueve el cursor **en la misma transacción**. La pasada termina con la primera página incompleta y deja el cursor en 0.
+
+Si algo falla se deshace solo el lote en curso y el siguiente intento reanuda desde el cursor. Una pasada nueva reescribe por clave primaria, así que repetir la sincronización no duplica filas. La interfaz recibe los lotes a medida que se confirman, porque observa la base de datos.
 
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
 
