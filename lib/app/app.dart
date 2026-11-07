@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'catalog_auto_sync.dart';
 import 'providers.dart';
 import 'router.dart';
 
 /// Raíz de la aplicación: `MaterialApp.router` con el router del provider.
-/// Mantiene vivo el monitor de conectividad mientras la app esté abierta.
+/// Mantiene vivos el monitor de conectividad y la sincronización automática
+/// del catálogo mientras la app esté abierta.
 /// El tema es provisional hasta que llegue el sistema de diseño Regi (lib/ui).
 class RegiDexApp extends ConsumerWidget {
   const RegiDexApp({super.key});
@@ -13,6 +15,7 @@ class RegiDexApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(connectivityMonitorProvider);
+    ref.watch(catalogAutoSyncProvider);
     return MaterialApp.router(
       title: 'RegiDex',
       theme: ThemeData(

@@ -37,6 +37,9 @@ class CatalogSync {
   /// Vigencia de los datos de referencia (PS-03).
   static const referenceMaxAge = Duration(days: 30);
 
+  /// Vigencia del catálogo ligero (PS-03).
+  static const catalogMaxAge = Duration(days: 7);
+
   final PokemonRemoteSource _remote;
   final CatalogLocalSource _local;
   final SyncCoordinator _coordinator;
