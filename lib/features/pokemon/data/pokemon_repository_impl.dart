@@ -20,11 +20,14 @@ class PokemonRepositoryImpl implements PokemonRepository {
   final CatalogSync _sync;
 
   /// Pokémon de la base local como entidades de dominio. Por ahora [query]
-  /// está vacía y devuelve todo el catálogo por número nacional.
+  /// está vacía y devuelve todo el catálogo por número nacional. Solo emite
+  /// cuando la lista cambia: guardar la referencia toca la tabla de tipos pero
+  /// no debe reconstruir la pantalla.
   @override
   Stream<List<Pokemon>> watchPokemon(PokemonQuery query) => _catalog
       .watchPokemonWithTypes()
-      .map((items) => [for (final item in items) pokemonFromRows(item)]);
+      .map((items) => [for (final item in items) pokemonFromRows(item)])
+      .distinct(samePokemonList);
 
   /// Pide la sincronización al coordinador, que une las solicitudes
   /// simultáneas en una sola ejecución (single-flight).
