@@ -56,8 +56,7 @@ class CatalogSync {
     var offset = await _local.readCursor(resourceKey);
     while (true) {
       final data = await _remote.fetchPage(offset: offset, limit: pageSize);
-      final syncedAt = clock.now();
-      final records = await _offload(() => mapPokemonPage(data, syncedAt));
+      final records = await _mapPage(_offload, data, clock.now());
 
       final isLast = records.length < pageSize;
       final nextOffset = isLast ? 0 : offset + records.length;
@@ -73,8 +72,22 @@ class CatalogSync {
     if (await _local.isReferenceFresh(referenceKey, referenceMaxAge)) return;
     await _coordinator.run<void>(referenceKey, () async {
       final data = await _remote.fetchReference();
-      final records = await _offload(() => mapReferenceData(data));
-      await _local.saveReference(records);
+      await _local.saveReference(await _mapReference(_offload, data));
     });
   }
 }
+
+// Estas dos funciones existen para que el closure que viaja al isolate solo
+// capture los datos: si se creara dentro de un método de CatalogSync arrastraría
+// `this` (el coordinador y sus Future en vuelo), que no se puede enviar.
+
+Future<List<PokemonRecord>> _mapPage(
+  Offload offload,
+  Map<String, dynamic> data,
+  DateTime syncedAt,
+) => offload(() => mapPokemonPage(data, syncedAt));
+
+Future<ReferenceRecords> _mapReference(
+  Offload offload,
+  Map<String, dynamic> data,
+) => offload(() => mapReferenceData(data));
