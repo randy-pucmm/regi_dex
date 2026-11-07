@@ -5,13 +5,21 @@ import 'package:regi_dex/app/app.dart';
 import 'package:regi_dex/app/providers.dart';
 
 import '../core/connectivity/connectivity_fakes.dart';
+import '../core/database/database_test_helpers.dart';
+import '../features/pokemon/fake_pokemon_repository.dart';
 
+/// Abre la app sin red real ni disco: BD en memoria y repositorio falso, para
+/// que la sincronización automática no salga a PokéAPI.
 Future<void> _pumpApp(WidgetTester tester) async {
+  final db = createTestDatabase();
+  addTearDown(db.close);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         networkSourceProvider.overrideWithValue(FakeNetworkSource()),
         healthCheckerProvider.overrideWithValue(FakeHealthChecker()),
+        appDatabaseProvider.overrideWithValue(db),
+        pokemonRepositoryProvider.overrideWithValue(FakePokemonRepository()),
       ],
       child: const RegiDexApp(),
     ),
