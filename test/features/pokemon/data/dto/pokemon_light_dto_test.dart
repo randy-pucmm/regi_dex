@@ -9,6 +9,7 @@ Map<String, dynamic> _bulbasaur() => {
   'weight': 69,
   'pokemon_species_id': 1,
   'pokemonspecy': {
+    'name': 'bulbasaur',
     'generation_id': 1,
     'evolution_chain_id': 1,
     'is_legendary': false,
@@ -51,6 +52,7 @@ void main() {
     expect(dto.height, 7);
     expect(dto.weight, 69);
     expect(dto.speciesId, 1);
+    expect(dto.species.name, 'bulbasaur');
     expect(dto.species.generationId, 1);
     expect(dto.species.evolutionChainId, 1);
     expect(dto.species.eggGroupIds, [1, 7]);
@@ -109,6 +111,15 @@ void main() {
       expect(
         () => PokemonLightDto.fromJson(json),
         invalid('pokemon.pokemontypes[1].type_id'),
+      );
+    });
+
+    test('falta el nombre de la especie', () {
+      final json = _bulbasaur();
+      (json['pokemonspecy'] as Map<String, dynamic>).remove('name');
+      expect(
+        () => PokemonLightDto.fromJson(json),
+        invalid('pokemon.pokemonspecy.name'),
       );
     });
 

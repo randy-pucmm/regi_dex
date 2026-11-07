@@ -28,4 +28,15 @@ class SyncMetadataDao extends DatabaseAccessor<AppDatabase>
   /// Inserta o actualiza el estado de un recurso por su `resourceKey`.
   Future<void> upsert(SyncMetadataEntriesCompanion entry) =>
       into(syncMetadataEntries).insertOnConflictUpdate(entry);
+
+  /// Guarda [offset] como cursor confirmado de [resourceKey] sin tocar el resto
+  /// de la fila. Devuelve false si el recurso aún no tiene fila (la crea el
+  /// `SyncCoordinator` al empezar), en cuyo caso no cambia nada.
+  Future<bool> advanceCursor(String resourceKey, int offset) async {
+    final updated =
+        await (update(syncMetadataEntries)
+              ..where((e) => e.resourceKey.equals(resourceKey)))
+            .write(SyncMetadataEntriesCompanion(cursorOffset: Value(offset)));
+    return updated > 0;
+  }
 }

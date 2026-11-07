@@ -96,6 +96,29 @@ void main() {
       expect(row.cursorOffset, 0);
     });
 
+    test('advanceCursor solo cambia el cursor de ese recurso', () async {
+      await db.syncMetadataDao.upsert(entry('syncing', attempts: 1));
+      await db.syncMetadataDao.upsert(
+        SyncMetadataEntriesCompanion.insert(
+          resourceKey: 'reference',
+          status: 'completed',
+        ),
+      );
+
+      expect(await db.syncMetadataDao.advanceCursor('catalog', 400), isTrue);
+
+      final catalog = await db.syncMetadataDao.getEntry('catalog');
+      expect(catalog!.cursorOffset, 400);
+      expect(catalog.status, 'syncing');
+      expect(catalog.attempts, 1);
+      expect((await db.syncMetadataDao.getEntry('reference'))!.cursorOffset, 0);
+    });
+
+    test('advanceCursor no crea filas: devuelve false sin fila', () async {
+      expect(await db.syncMetadataDao.advanceCursor('catalog', 200), isFalse);
+      expect(await rowCount(db, 'sync_metadata'), 0);
+    });
+
     test('getEntry devuelve null si el recurso nunca se sincronizó', () async {
       expect(await db.syncMetadataDao.getEntry('reference'), isNull);
     });

@@ -84,6 +84,7 @@ class PokemonLightDto {
 /// Datos de la especie incluidos en el catálogo ligero.
 class SpeciesLightDto {
   const SpeciesLightDto({
+    required this.name,
     required this.generationId,
     required this.eggGroupIds,
     this.evolutionChainId,
@@ -92,6 +93,7 @@ class SpeciesLightDto {
   });
 
   factory SpeciesLightDto._fromReader(JsonReader reader) => SpeciesLightDto(
+    name: reader.string('name'),
     generationId: reader.integer('generation_id'),
     evolutionChainId: reader.integerOrNull('evolution_chain_id'),
     isLegendary: reader.boolean('is_legendary'),
@@ -102,6 +104,8 @@ class SpeciesLightDto {
     ],
   );
 
+  /// Nombre de la especie (puede diferir del de la forma, p. ej. `deoxys`).
+  final String name;
   final int generationId;
   final int? evolutionChainId;
   final bool isLegendary;
