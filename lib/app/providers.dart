@@ -14,6 +14,9 @@ import '../core/network/poke_api_config.dart';
 import '../core/sync/api_budget.dart';
 import '../core/sync/sync_coordinator.dart';
 import '../core/sync/sync_status.dart';
+import '../features/pokemon/data/catalog_local_source.dart';
+import '../features/pokemon/data/catalog_sync.dart';
+import '../features/pokemon/data/pokemon_remote_source.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
 /// con una base en memoria.
@@ -96,4 +99,22 @@ final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
 /// Estado de la sincronización para el indicador global.
 final syncStatusProvider = StreamProvider<SyncStatus>(
   (ref) => ref.watch(syncCoordinatorProvider).statuses,
+);
+
+/// Llamadas del catálogo a PokéAPI, dentro del presupuesto de llamadas.
+final pokemonRemoteSourceProvider = Provider<PokemonRemoteSource>(
+  (ref) => PokemonRemoteSource(
+    client: ref.watch(pokeApiClientProvider),
+    budget: ref.watch(apiBudgetProvider),
+  ),
+);
+
+/// Sincronización del catálogo. Se ejecuta con
+/// `coordinator.run(CatalogSync.resourceKey, sync.execute)`.
+final catalogSyncProvider = Provider<CatalogSync>(
+  (ref) => CatalogSync(
+    remote: ref.watch(pokemonRemoteSourceProvider),
+    local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
+    coordinator: ref.watch(syncCoordinatorProvider),
+  ),
 );
