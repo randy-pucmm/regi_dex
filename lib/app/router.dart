@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../features/favorites/presentation/favorites_page.dart';
 import '../features/pokemon/presentation/catalog_page.dart';
-import '../features/settings/presentation/settings_page.dart';
 import '../features/team_builder/presentation/team_builder_page.dart';
 import '../features/trivia/presentation/trivia_page.dart';
 import 'app_shell.dart';
@@ -37,10 +36,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.trivia,
             builder: (context, state) => const TriviaPage(),
-          ),
-          GoRoute(
-            path: AppRoutes.settings,
-            builder: (context, state) => const SettingsPage(),
           ),
         ],
       ),
