@@ -166,6 +166,12 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 
 Si algo falla se deshace solo el lote en curso y el siguiente intento reanuda desde el cursor. Una pasada nueva reescribe por clave primaria, así que repetir la sincronización no duplica filas. La interfaz recibe los lotes a medida que se confirman, porque observa la base de datos.
 
+**Repositorio y arranque.** La interfaz no ve GraphQL ni Drift: consume `PokemonRepository` (contrato en `domain`) mediante los casos de uso `WatchPokemon` y `RefreshCatalog`.
+
+- `watchPokemon(query)` emite entidades `Pokemon` con sus tipos desde la base local, una vez por lote confirmado y solo cuando la lista cambia. Por ahora la consulta vacía devuelve todo por número nacional; la búsqueda y los filtros la ampliarán.
+- `refresh()` pide la sincronización al `SyncCoordinator`, que une las solicitudes simultáneas en una sola.
+- Al abrir la app y cada vez que el servicio pasa a online, `catalogAutoSyncProvider` sincroniza el catálogo si hace falta: nunca se completó, quedó a medias o fallida, o tiene más de 7 días. Se lanza sin esperar, así que no bloquea el arranque. Con el catálogo vigente no hace ninguna llamada.
+
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
 
 ## 10. Persistencia local

@@ -18,39 +18,7 @@ import 'package:regi_dex/features/pokemon/data/pokemon_remote_source.dart';
 import '../../../core/database/database_test_helpers.dart';
 import '../../../core/sync/fake_time.dart';
 import 'catalog_test_data.dart';
-
-/// Remoto falso: sirve páginas sintéticas y registra qué se le pidió.
-class _FakeRemote implements PokemonRemoteSource {
-  _FakeRemote({this.total = 450});
-
-  final int total;
-  var referenceCalls = 0;
-  final pageOffsets = <int>[];
-
-  /// Offset en el que la llamada falla con [NetworkFailure].
-  int? failAtOffset;
-
-  /// Permite alterar la página antes de entregarla.
-  void Function(Map<String, dynamic> page)? tamper;
-
-  @override
-  Future<Map<String, dynamic>> fetchReference() async {
-    referenceCalls++;
-    return syntheticReference(total: total);
-  }
-
-  @override
-  Future<Map<String, dynamic>> fetchPage({
-    required int offset,
-    required int limit,
-  }) async {
-    pageOffsets.add(offset);
-    if (offset == failAtOffset) throw const NetworkFailure();
-    final page = syntheticPage(offset: offset, limit: limit, total: total);
-    tamper?.call(page);
-    return page;
-  }
-}
+import 'fake_pokemon_remote.dart';
 
 /// Quita el nombre del Pokémon [id] de la página, si está en ella.
 void Function(Map<String, dynamic>) _removeName(int id) => (page) {
@@ -114,7 +82,7 @@ void main() {
 
   group('pasada completa', () {
     test('descarga la referencia y todo el catálogo en lotes', () async {
-      final remote = _FakeRemote();
+      final remote = FakePokemonRemote();
 
       await runSync(syncWith(remote));
 
@@ -132,7 +100,7 @@ void main() {
     });
 
     test('guarda el nombre de la especie y el content_hash', () async {
-      await runSync(syncWith(_FakeRemote()));
+      await runSync(syncWith(FakePokemonRemote()));
 
       final species = await (db.select(
         db.species,
@@ -166,7 +134,7 @@ void main() {
     });
 
     test('con páginas chicas la última sale corta', () async {
-      final remote = _FakeRemote(total: 5);
+      final remote = FakePokemonRemote(total: 5);
 
       await runSync(syncWith(remote, pageSize: 2));
 
@@ -178,7 +146,7 @@ void main() {
     test(
       'con un total múltiplo del lote cierra con una página vacía',
       () async {
-        final remote = _FakeRemote(total: 4);
+        final remote = FakePokemonRemote(total: 4);
 
         await runSync(syncWith(remote, pageSize: 2));
 
@@ -191,7 +159,7 @@ void main() {
 
   group('idempotencia (PA-13)', () {
     test('tres sincronizaciones seguidas no cambian los conteos', () async {
-      final remote = _FakeRemote();
+      final remote = FakePokemonRemote();
       final sync = syncWith(remote);
 
       await runSync(sync);
@@ -220,7 +188,7 @@ void main() {
 
   group('referencia', () {
     test('no se vuelve a pedir mientras está vigente', () async {
-      final remote = _FakeRemote();
+      final remote = FakePokemonRemote();
       final sync = syncWith(remote);
 
       await runSync(sync);
@@ -231,7 +199,7 @@ void main() {
     });
 
     test('se pide de nuevo al vencer los 30 días', () async {
-      final remote = _FakeRemote();
+      final remote = FakePokemonRemote();
       final sync = syncWith(remote);
 
       await runSync(sync);
@@ -242,7 +210,7 @@ void main() {
     });
 
     test('un fallo en la referencia no pide ninguna página', () async {
-      final remote = _FakeRemote();
+      final remote = FakePokemonRemote();
       final failing = _FailingReference(remote);
 
       await expectLater(
@@ -261,7 +229,7 @@ void main() {
       final subscription = db.catalogDao.watchPokemonCount().listen(counts.add);
       await pumpEventQueue();
 
-      await runSync(syncWith(_FakeRemote()));
+      await runSync(syncWith(FakePokemonRemote()));
       await pumpEventQueue();
       await subscription.cancel();
 
@@ -271,7 +239,7 @@ void main() {
 
   group('interrupción y reanudación (PA-09)', () {
     test('conserva los lotes confirmados y reanuda desde el cursor', () async {
-      final remote = _FakeRemote()..failAtOffset = 400;
+      final remote = FakePokemonRemote()..failAtOffset = 400;
 
       await expectLater(
         runSync(syncWith(remote)),
@@ -307,7 +275,7 @@ void main() {
     test(
       'el resultado de interrumpir y reanudar es el de una pasada limpia',
       () async {
-        final interrupted = _FakeRemote()..failAtOffset = 200;
+        final interrupted = FakePokemonRemote()..failAtOffset = 200;
         await expectLater(
           runSync(syncWith(interrupted)),
           throwsA(isA<NetworkFailure>()),
@@ -327,7 +295,7 @@ void main() {
           () => cleanCoordinator.run<void>(
             CatalogSync.resourceKey,
             CatalogSync(
-              remote: _FakeRemote(),
+              remote: FakePokemonRemote(),
               local: CatalogLocalSource(clean),
               coordinator: cleanCoordinator,
             ).execute,
@@ -343,7 +311,7 @@ void main() {
     test(
       'un Pokémon inválido descarta todo el lote y no mueve el cursor',
       () async {
-        final remote = _FakeRemote()..tamper = _removeName(250);
+        final remote = FakePokemonRemote()..tamper = _removeName(250);
 
         await expectLater(
           runSync(syncWith(remote)),
@@ -357,7 +325,7 @@ void main() {
     );
 
     test('una FK rota deshace el lote entero en la BD', () async {
-      final remote = _FakeRemote()..tamper = _breakTypeFk(250);
+      final remote = FakePokemonRemote()..tamper = _breakTypeFk(250);
 
       await expectLater(runSync(syncWith(remote)), throwsA(anything));
 
@@ -371,7 +339,7 @@ void main() {
 
   group('single-flight', () {
     test('dos solicitudes simultáneas hacen una sola pasada', () async {
-      final remote = _FakeRemote();
+      final remote = FakePokemonRemote();
       final sync = syncWith(remote);
 
       await time.run(

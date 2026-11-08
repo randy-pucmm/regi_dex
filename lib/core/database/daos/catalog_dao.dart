@@ -5,6 +5,9 @@ import '../tables/catalog_tables.dart';
 
 part 'catalog_dao.g.dart';
 
+/// Un Pokémon con sus tipos ya resueltos, por orden de slot.
+typedef PokemonWithTypes = ({PokemonRow pokemon, List<TypeRow> types});
+
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
 @DriftAccessor(
   tables: [
@@ -22,6 +25,39 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   /// Todos los Pokémon por id; vuelve a emitir cuando cambia la tabla.
   Stream<List<PokemonRow>> watchAllPokemon() =>
       (select(pokemons)..orderBy([(p) => OrderingTerm.asc(p.id)])).watch();
+
+  /// Todos los Pokémon por id, cada uno con sus tipos por slot (uno o dos; la
+  /// lista queda vacía si aún no tiene). Es una sola consulta con join: vuelve
+  /// a emitir cuando cambia el catálogo o la tabla de tipos, y como cada lote
+  /// de la sincronización es una transacción, emite una vez por lote.
+  Stream<List<PokemonWithTypes>> watchPokemonWithTypes() {
+    final typeTable = attachedDatabase.types;
+    final query =
+        select(pokemons).join([
+          leftOuterJoin(
+            pokemonTypes,
+            pokemonTypes.pokemonId.equalsExp(pokemons.id),
+          ),
+          leftOuterJoin(typeTable, typeTable.id.equalsExp(pokemonTypes.typeId)),
+        ])..orderBy([
+          OrderingTerm.asc(pokemons.id),
+          OrderingTerm.asc(pokemonTypes.slot),
+        ]);
+
+    return query.watch().map((rows) {
+      final result = <PokemonWithTypes>[];
+      for (final row in rows) {
+        final pokemon = row.readTable(pokemons);
+        final type = row.readTableOrNull(typeTable);
+        if (result.isEmpty || result.last.pokemon.id != pokemon.id) {
+          result.add((pokemon: pokemon, types: [?type]));
+        } else if (type != null) {
+          result.last.types.add(type);
+        }
+      }
+      return result;
+    });
+  }
 
   /// Cantidad de Pokémon del catálogo, como flujo.
   Stream<int> watchPokemonCount() {

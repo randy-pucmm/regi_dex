@@ -21,6 +21,8 @@ import 'package:regi_dex/ui/tokens/led_state.dart';
 import 'package:regi_dex/ui/tokens/regi_palette.dart';
 
 import '../core/connectivity/connectivity_fakes.dart';
+import '../core/database/database_test_helpers.dart';
+import '../features/pokemon/fake_pokemon_repository.dart';
 import '../helpers/ui_test_helpers.dart';
 
 /// Destinos de Inicio que abren una pantalla (Ajustes abre una ventana).
@@ -51,6 +53,8 @@ Future<void> _pumpApp(
 }) async {
   useScreen(tester, size, textScale: textScale);
   reduceMotion(tester);
+  final db = createTestDatabase();
+  addTearDown(db.close);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -61,6 +65,8 @@ Future<void> _pumpApp(
         ),
         syncStatusProvider.overrideWith((ref) => Stream.value(sync)),
         lastSyncAtProvider.overrideWith((ref) => Stream.value(lastSync)),
+        appDatabaseProvider.overrideWithValue(db),
+        pokemonRepositoryProvider.overrideWithValue(FakePokemonRepository()),
       ],
       child: const RegiDexApp(),
     ),
