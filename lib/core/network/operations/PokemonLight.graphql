@@ -6,6 +6,7 @@ fragment PokemonLight on pokemon {
   weight
   pokemon_species_id
   pokemonspecy {
+    name
     generation_id
     evolution_chain_id
     is_legendary

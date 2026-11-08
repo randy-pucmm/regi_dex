@@ -57,6 +57,9 @@ dependencies:
   cached_network_image: 4.0.6
   flutter_cache_manager: 3.5.0
 
+  # SHA-1 del content_hash de integridad (ADR-006).
+  crypto: 3.0.8
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
