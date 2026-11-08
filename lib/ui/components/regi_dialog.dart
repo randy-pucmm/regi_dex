@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../tokens/regi_colors.dart';
 
-/// Ventana emergente oscura de la Pokédex: esquinas biseladas, filete claro y
-/// el título arriba. No trae botón de cierre: el contenido ofrece el suyo
-/// («Listo») y `showDialog` ya cierra al tocar fuera o con «atrás».
-///
-/// Es para contenido corto; si crece, el cuerpo se desplaza.
+/// Ventana emergente oscura. Sin botón de cierre: el contenido ofrece el suyo y
+/// `showDialog` ya cierra al tocar fuera. Si el contenido crece, se desplaza.
 class RegiDialog extends StatelessWidget {
   const RegiDialog({
     super.key,
@@ -22,7 +19,6 @@ class RegiDialog extends StatelessWidget {
   final String title;
   final Widget child;
 
-  /// Dónde se ancla la ventana (arriba para dejar a la vista la cabecera).
   final AlignmentGeometry alignment;
   final EdgeInsets insetPadding;
 

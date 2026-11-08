@@ -6,13 +6,12 @@ import 'regi_theme.dart';
 
 /// Fabrica los `ThemeData` Material 3 de los seis temas Regi.
 abstract final class RegiThemes {
-  /// Tema que usa la app hasta que el usuario elija otro (RD-34).
+  /// Hasta que el usuario elija otro (RD-34).
   static const defaultVariant = RegiVariant.regirock;
 
   static const _display = 'Chakra Petch';
   static const _body = 'Figtree';
 
-  /// `ThemeData` de [variant] para el [brightness] dado.
   static ThemeData build(RegiVariant variant, Brightness brightness) {
     final regi = RegiTheme.forVariant(variant, brightness);
     final swatch = RegiPalette.of(variant, brightness);
@@ -37,7 +36,6 @@ abstract final class RegiThemes {
     );
   }
 
-  /// Chakra Petch para títulos y etiquetas; Figtree para el cuerpo.
   static TextTheme _textTheme(Color color) {
     TextStyle display(double size, FontWeight weight, {double spacing = 0.5}) =>
         TextStyle(

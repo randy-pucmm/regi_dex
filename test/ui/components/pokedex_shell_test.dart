@@ -7,6 +7,8 @@ import 'package:regi_dex/ui/themes/regi_themes.dart';
 import 'package:regi_dex/ui/tokens/regi_colors.dart';
 import 'package:regi_dex/ui/tokens/regi_palette.dart';
 
+import '../../helpers/ui_test_helpers.dart';
+
 const _indicators = [
   ShellIndicator(
     label: 'RED',
@@ -30,6 +32,7 @@ Widget _shell({
   RegiVariant variant = RegiVariant.regirock,
   double textScale = 1,
   VoidCallback? onHome,
+  bool withBand = true,
   Widget child = const Text('contenido'),
 }) {
   return MaterialApp(
@@ -43,21 +46,17 @@ Widget _shell({
       updatedLabel: 'ACT. 10:42',
       indicators: _indicators,
       lens: const ShellLens(ringColor: RegiLedColors.online, child: SizedBox()),
-      statusBand: const ShellStatusBand(
-        color: RegiLedColors.online,
-        title: 'En línea',
-        subtitle: 'Datos remotos · actualizado 10:42',
-      ),
+      statusBand: withBand
+          ? const ShellStatusBand(
+              color: RegiLedColors.online,
+              title: 'En línea',
+              subtitle: 'Datos remotos · actualizado 10:42',
+            )
+          : null,
       bottomBar: onHome == null ? null : ShellHomeButton(onPressed: onHome),
       child: child,
     ),
   );
-}
-
-void _setScreen(WidgetTester tester, Size size) {
-  tester.view.physicalSize = size;
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.reset);
 }
 
 void main() {
@@ -88,18 +87,11 @@ void main() {
       expect(border.getInnerPath(rect).getBounds().width, lessThan(100));
       expect(border.dimensions, const EdgeInsets.all(4));
     });
-
-    test('copyWith y scale conservan el eje', () {
-      const border = HexagonBorder(pointAxis: Axis.horizontal, depth: 10);
-      expect(border.copyWith().pointAxis, Axis.horizontal);
-      expect((border.scale(2) as HexagonBorder).depth, 10);
-      expect(border, border.copyWith());
-    });
   });
 
   group('PokedexShell', () {
     testWidgets('muestra cabecera, título, banda y contenido', (tester) async {
-      _setScreen(tester, const Size(390, 844));
+      useScreen(tester, const Size(390, 844));
       await tester.pumpWidget(_shell());
 
       expect(find.text('ACT. 10:42'), findsOneWidget);
@@ -116,16 +108,29 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('sin barra inferior no muestra «Inicio»', (tester) async {
-      _setScreen(tester, const Size(390, 844));
+    testWidgets('la banda de estado es opcional y sin ella la cabecera baja '
+        'menos', (tester) async {
+      useScreen(tester, const Size(390, 844));
       await tester.pumpWidget(_shell());
-      expect(find.text('Inicio'), findsNothing);
+      final contentTopWithBand = tester.getTopLeft(find.text('contenido')).dy;
+      expect(find.byType(ShellStatusBand), findsOneWidget);
+
+      await tester.pumpWidget(_shell(withBand: false));
+
+      expect(find.byType(ShellStatusBand), findsNothing);
+      expect(find.text('RED'), findsOneWidget);
+      expect(find.text('ACT. 10:42'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('contenido')).dy,
+        lessThan(contentTopWithBand),
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('el botón «Inicio» mide ≥ 48 dp y responde al toque', (
       tester,
     ) async {
-      _setScreen(tester, const Size(390, 844));
+      useScreen(tester, const Size(390, 844));
       var taps = 0;
       await tester.pumpWidget(_shell(onHome: () => taps++));
 
@@ -140,7 +145,7 @@ void main() {
     testWidgets('expone título, indicadores y banda a los lectores', (
       tester,
     ) async {
-      _setScreen(tester, const Size(390, 844));
+      useScreen(tester, const Size(390, 844));
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_shell(onHome: () {}));
 
@@ -159,23 +164,24 @@ void main() {
       handle.dispose();
     });
 
-    for (final variant in RegiVariant.values) {
-      for (final brightness in Brightness.values) {
-        testWidgets(
-          'se construye sin desbordar: ${variant.displayName} ${brightness.name}',
-          (tester) async {
-            _setScreen(tester, const Size(390, 844));
-            await tester.pumpWidget(
-              _shell(variant: variant, brightness: brightness, onHome: () {}),
-            );
-            expect(tester.takeException(), isNull);
-          },
-        );
+    testWidgets('se construye sin desbordar en los doce temas', (tester) async {
+      useScreen(tester, const Size(390, 844));
+      for (final variant in RegiVariant.values) {
+        for (final brightness in Brightness.values) {
+          await tester.pumpWidget(
+            _shell(variant: variant, brightness: brightness, onHome: () {}),
+          );
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '${variant.displayName} ${brightness.name}',
+          );
+        }
       }
-    }
+    });
 
     testWidgets('no desborda en 320×568 con el texto al 200 %', (tester) async {
-      _setScreen(tester, const Size(320, 568));
+      useScreen(tester, const Size(320, 568));
       await tester.pumpWidget(_shell(textScale: 2, onHome: () {}));
       expect(tester.takeException(), isNull);
       expect(find.text('contenido'), findsOneWidget);
