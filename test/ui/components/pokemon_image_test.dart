@@ -1,37 +1,19 @@
-import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/ui/components/pokemon_image.dart';
 
+import '../../helpers/fake_image_cache.dart';
 import '../../helpers/ui_test_helpers.dart';
 
 const _caption = 'Imagen no disponible offline';
 
-/// Gestor de caché cuyo resultado controla la prueba.
-class _FakeCacheManager extends Fake implements BaseCacheManager {
-  _FakeCacheManager(this._response);
-
-  final Stream<FileResponse> Function() _response;
-
-  @override
-  Stream<FileResponse> getFileStream(
-    String url, {
-    String? key,
-    Map<String, String>? headers,
-    bool withProgress = false,
-  }) => _response();
-}
-
 /// Sin red y sin la imagen guardada.
-_FakeCacheManager _offline() =>
-    _FakeCacheManager(() => Stream.error(const SocketExceptionStub()));
+FakeImageCache _offline() =>
+    FakeImageCache(() => Stream.error(const SocketExceptionStub()));
 
-/// Descargando: no llega nada.
-_FakeCacheManager _loading() =>
-    _FakeCacheManager(() => StreamController<FileResponse>().stream);
+FakeImageCache _loading() => FakeImageCache();
 
 class SocketExceptionStub implements Exception {
   const SocketExceptionStub();
