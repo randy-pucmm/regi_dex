@@ -76,6 +76,101 @@ void main() {
     expect(await db.catalogDao.getPokemon(404), isNull);
   });
 
+  group('watchPokemonWithTypes', () {
+    Future<void> addPokemon(
+      int id, {
+      List<({int slot, int typeId})> types = const [],
+    }) async {
+      await db.catalogDao.upsertSpecies(
+        SpeciesCompanion.insert(
+          id: Value(id),
+          name: 'species-$id',
+          generationId: 1,
+        ),
+      );
+      await db.catalogDao.upsertPokemon(
+        PokemonsCompanion.insert(
+          id: Value(id),
+          speciesId: id,
+          name: 'pokemon-$id',
+          lightSyncedAt: DateTime(2026, 11, 7),
+        ),
+        types: types,
+        stats: const [],
+        abilities: const [],
+      );
+    }
+
+    /// Resumen `id: [tipos]` de cada Pokémon emitido.
+    Future<Map<int, List<String>>> summary() async => {
+      for (final item in await db.catalogDao.watchPokemonWithTypes().first)
+        item.pokemon.id: [for (final type in item.types) type.name],
+    };
+
+    test('une los tipos por slot aunque se hayan guardado al revés', () async {
+      await addPokemon(
+        1,
+        types: const [(slot: 2, typeId: 4), (slot: 1, typeId: 12)],
+      );
+
+      expect(await summary(), {
+        1: ['grass', 'poison'],
+      });
+    });
+
+    test('un Pokémon sin tipos aparece con la lista vacía', () async {
+      await addPokemon(7);
+
+      expect(await summary(), {7: <String>[]});
+    });
+
+    test('ordena por id', () async {
+      await addPokemon(25, types: const [(slot: 1, typeId: 12)]);
+      await addPokemon(1, types: const [(slot: 1, typeId: 4)]);
+      await addPokemon(4);
+
+      expect((await summary()).keys, [1, 4, 25]);
+    });
+
+    test('emite una vez por transacción y no por fila', () async {
+      final emissions = <List<int>>[];
+      final subscription = db.catalogDao.watchPokemonWithTypes().listen(
+        (items) => emissions.add([for (final i in items) i.pokemon.id]),
+      );
+      await pumpEventQueue();
+
+      await db.transaction(() async {
+        await addPokemon(1, types: const [(slot: 1, typeId: 12)]);
+        await addPokemon(2, types: const [(slot: 1, typeId: 4)]);
+      });
+      await pumpEventQueue();
+      await subscription.cancel();
+
+      expect(emissions, [
+        <int>[],
+        [1, 2],
+      ]);
+    });
+
+    test('refleja el reemplazo de tipos', () async {
+      await upsertBulbasaur(db);
+      final names = db.catalogDao.watchPokemonWithTypes().map(
+        (items) => [for (final type in items.single.types) type.name],
+      );
+      final expectation = expectLater(
+        names,
+        emitsInOrder([
+          ['grass', 'poison'],
+          ['grass'],
+        ]),
+      );
+      await pumpEventQueue();
+
+      await upsertBulbasaur(db, types: const [(slot: 1, typeId: 12)]);
+      await expectation;
+    });
+  });
+
   test('watchAllPokemon y watchPokemonCount emiten al escribir', () async {
     final ids = db.catalogDao.watchAllPokemon().map(
       (rows) => [for (final row in rows) row.id],

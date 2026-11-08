@@ -11,10 +11,14 @@ import 'package:regi_dex/ui/themes/regi_theme.dart';
 import 'package:regi_dex/ui/tokens/regi_palette.dart';
 
 import '../core/connectivity/connectivity_fakes.dart';
+import '../core/database/database_test_helpers.dart';
+import '../features/pokemon/fake_pokemon_repository.dart';
 
 /// Destinos de Inicio que abren una pantalla (Ajustes abre una ventana).
 const _screens = ['Catálogo', 'Favoritos', 'Equipos', 'Trivia'];
 
+/// Abre la app sin red real ni disco: BD en memoria y repositorio falso, para
+/// que la sincronización automática no salga a PokéAPI.
 Future<void> _pumpApp(
   WidgetTester tester, {
   Size size = const Size(390, 844),
@@ -25,11 +29,15 @@ Future<void> _pumpApp(
   tester.platformDispatcher.textScaleFactorTestValue = textScale;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  final db = createTestDatabase();
+  addTearDown(db.close);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         networkSourceProvider.overrideWithValue(FakeNetworkSource()),
         healthCheckerProvider.overrideWithValue(FakeHealthChecker()),
+        appDatabaseProvider.overrideWithValue(db),
+        pokemonRepositoryProvider.overrideWithValue(FakePokemonRepository()),
       ],
       child: const RegiDexApp(),
     ),

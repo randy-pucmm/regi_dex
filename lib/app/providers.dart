@@ -17,6 +17,10 @@ import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
+import '../features/pokemon/data/pokemon_repository_impl.dart';
+import '../features/pokemon/domain/pokemon_repository.dart';
+import '../features/pokemon/domain/refresh_catalog.dart';
+import '../features/pokemon/domain/watch_pokemon.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
 /// con una base en memoria.
@@ -117,4 +121,24 @@ final catalogSyncProvider = Provider<CatalogSync>(
     local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
     coordinator: ref.watch(syncCoordinatorProvider),
   ),
+);
+
+/// Repositorio del catálogo: lo que la interfaz consume en lugar de GraphQL
+/// o Drift. Las pruebas lo sobrescriben con uno falso.
+final pokemonRepositoryProvider = Provider<PokemonRepository>(
+  (ref) => PokemonRepositoryImpl(
+    catalog: ref.watch(appDatabaseProvider).catalogDao,
+    coordinator: ref.watch(syncCoordinatorProvider),
+    sync: ref.watch(catalogSyncProvider),
+  ),
+);
+
+/// Caso de uso: observar el catálogo.
+final watchPokemonProvider = Provider<WatchPokemon>(
+  (ref) => WatchPokemon(ref.watch(pokemonRepositoryProvider)),
+);
+
+/// Caso de uso: sincronizar el catálogo ahora.
+final refreshCatalogProvider = Provider<RefreshCatalog>(
+  (ref) => RefreshCatalog(ref.watch(pokemonRepositoryProvider)),
 );
