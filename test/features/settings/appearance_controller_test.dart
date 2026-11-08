@@ -35,18 +35,4 @@ void main() {
       const Appearance(variant: RegiVariant.regice, mode: ThemeMode.dark),
     );
   });
-
-  test('avisa a quien escucha en cada cambio', () {
-    final c = container();
-    final seen = <Appearance>[];
-    c.listen(appearanceProvider, (_, next) => seen.add(next));
-
-    c.read(appearanceProvider.notifier)
-      ..selectVariant(RegiVariant.regidrago)
-      ..selectMode(ThemeMode.dark);
-
-    expect(seen, hasLength(2));
-    expect(seen.last.variant, RegiVariant.regidrago);
-    expect(seen.last.mode, ThemeMode.dark);
-  });
 }

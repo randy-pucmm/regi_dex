@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import '../themes/regi_theme.dart';
 import '../tokens/regi_colors.dart';
 
-/// Una estadística base: etiqueta, valor y barra proporcional.
-///
-/// Está pensada para fondos oscuros (la carcasa o las celdas del detalle):
-/// el valor usa `onShell` y la etiqueta, el color de la estadística.
+/// Una estadística base con su barra proporcional, para fondos oscuros.
 class StatBar extends StatelessWidget {
   const StatBar({
     super.key,
@@ -15,14 +12,12 @@ class StatBar extends StatelessWidget {
     this.max = 255,
   });
 
-  /// Estadística que representa; define etiqueta y color.
   final RegiStat stat;
   final int value;
 
-  /// Valor que llena la barra por completo (255 es el tope de PokéAPI).
+  /// Valor que llena la barra (255 es el tope de PokéAPI).
   final int max;
 
-  /// Fracción de la barra que se pinta, entre 0 y 1.
   double get fraction => max <= 0 ? 0 : (value / max).clamp(0.0, 1.0);
 
   @override
