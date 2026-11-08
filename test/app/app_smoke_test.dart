@@ -52,6 +52,7 @@ Future<void> _pumpApp(
   SyncStatus sync = SyncStatus.inactiva,
   DateTime? lastSync,
   FakeHealthChecker? health,
+  FakePokemonRepository? repository,
 }) async {
   useScreen(tester, size, textScale: textScale);
   reduceMotion(tester);
@@ -63,7 +64,9 @@ Future<void> _pumpApp(
         networkSourceProvider.overrideWithValue(FakeNetworkSource()),
         healthCheckerProvider.overrideWithValue(health ?? FakeHealthChecker()),
         appDatabaseProvider.overrideWithValue(db),
-        pokemonRepositoryProvider.overrideWithValue(FakePokemonRepository()),
+        pokemonRepositoryProvider.overrideWithValue(
+          repository ?? FakePokemonRepository(),
+        ),
         serviceStatusProvider.overrideWith(
           (ref) => connectivityStream ?? Stream.value(connectivity),
         ),
@@ -454,21 +457,26 @@ void main() {
       expect(find.text('SINCRONIZAR AHORA'), findsNothing);
     });
 
-    testWidgets('«Sincronizar ahora» vuelve a comprobar PokéAPI y cierra', (
-      tester,
-    ) async {
-      final health = FakeHealthChecker();
-      await _pumpApp(tester, health: health);
-      await tester.tap(find.byType(StatusLed));
-      await tester.pumpAndSettle();
-      final before = health.calls;
+    testWidgets(
+      '«Sincronizar ahora» comprueba PokéAPI, sincroniza el catálogo y cierra',
+      (tester) async {
+        final health = FakeHealthChecker();
+        final repository = FakePokemonRepository();
+        await _pumpApp(tester, health: health, repository: repository);
+        await tester.tap(find.byType(StatusLed));
+        await tester.pumpAndSettle();
+        final checksBefore = health.calls;
+        // Al abrir la app en línea ya hubo una sync automática.
+        final refreshesBefore = repository.refreshes;
 
-      await tester.tap(find.text('SINCRONIZAR AHORA'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('SINCRONIZAR AHORA'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('SINCRONIZAR AHORA'), findsNothing);
-      expect(health.calls, greaterThan(before));
-    });
+        expect(find.text('SINCRONIZAR AHORA'), findsNothing);
+        expect(health.calls, greaterThan(checksBefore));
+        expect(repository.refreshes, refreshesBefore + 1);
+      },
+    );
 
     testWidgets('sin conexión «Sincronizar ahora» queda deshabilitado', (
       tester,
