@@ -125,6 +125,7 @@ lib/
 - **Actualización:** si PokéAPI responde, se descargan datos actualizados, se validan y se guardan **en transacción**; la UI recibe el cambio por observación.
 - **Errores:** un fallo remoto nunca borra datos válidos.
 - **Primera ejecución:** la app abre de inmediato y el catálogo llega por lotes en segundo plano.
+- **Pantalla del catálogo:** lista virtualizada (`ListView.builder`) con una a tres columnas según el ancho. Sus estados son clases selladas: `CatalogLoading`, `CatalogLoaded`, `CatalogEmpty` (sin catálogo y sin red) y `CatalogError`; los dos últimos ofrecen «Reintentar». Con datos, la lista se muestra aunque la sincronización siga o falle.
 
 El flujo completo y la secuencia de consulta están en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§3).
 
