@@ -125,6 +125,7 @@ lib/
 - **Actualización:** si PokéAPI responde, se descargan datos actualizados, se validan y se guardan **en transacción**; la UI recibe el cambio por observación.
 - **Errores:** un fallo remoto nunca borra datos válidos.
 - **Primera ejecución:** la app abre de inmediato y el catálogo llega por lotes en segundo plano.
+- **Pantalla del catálogo:** lista virtualizada (`ListView.builder`) con una a tres columnas según el ancho. Sus estados son clases selladas: `CatalogLoading`, `CatalogLoaded`, `CatalogEmpty` (sin catálogo y sin red) y `CatalogError`; los dos últimos ofrecen «Reintentar». Con datos, la lista se muestra aunque la sincronización siga o falle.
 
 El flujo completo y la secuencia de consulta están en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§3).
 
@@ -181,7 +182,8 @@ SQLite con Drift: claves estables de PokéAPI, tablas puente e índices para bú
 Las **imágenes no se guardan en la base de datos**:
 
 - El artwork pesa entre 120 y 210 KB por Pokémon, unos 165 MB en total.
-- Se usa una caché de archivos LRU de 150 MB.
+- Se usa una caché de archivos LRU de 150 MB y 1500 archivos (`RegiImageCacheManager`). La librería expulsa por antigüedad al pasar de 1500 archivos; la clase recorta los bytes sobrantes cada vez que se descarga algo nuevo.
+- `PokemonImage` decodifica al tamaño del contenedor y, sin la imagen en la caché y sin red, muestra el respaldo «Imagen no disponible offline».
 - Los favoritos quedan fijados para uso offline (ADR-004).
 
 El modelo de datos completo (diagramas ER) y la política de imágenes están en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§5).
@@ -190,20 +192,20 @@ El modelo de datos completo (diagramas ER) y la política de imágenes están en
 
 El estado del servicio se decide con un **health-check real contra PokéAPI**, no solo con la presencia de Wi-Fi o datos. La sincronización es una dimensión independiente.
 
-**Cuatro estados del LED.** Cada uno combina color, glifo, texto y una etiqueta `Semantics`:
+**Cuatro estados del LED.** Cada uno combina color, ojos animados, el glifo de los indicadores RED/API/DATOS, texto y una etiqueta `Semantics`:
 
-| Estado | Glifo |
-|---|---|
-| En línea | ● |
-| Sin conexión | ○ |
-| Servicio no disponible | ▲ |
-| Sincronizando | ↻ |
+| Estado | Ojos | Glifo |
+|---|---|---|
+| En línea | verdes; los del medio guiñan | ● |
+| Sin conexión | apagados, con un latido tenue | ○ |
+| Servicio no disponible | rojos, en tres tiempos | ◎ (en API) |
+| Sincronizando | amarillos; fuera y medios se turnan | ↻ (anillo que gira) |
 
 **Comportamiento.**
 
 - Una histéresis de 1.5 s evita parpadeos. Mientras se verifica se conserva el último estado estable.
 - El ping se envía al cambiar la red, al reintentar tras una caída (2 s × 2 con jitter, hasta 5 intentos) y tras 10 min sin tráfico. Una consulta exitosa cuenta como health-check.
-- Al tocar el LED se ve el detalle: red, API, origen y hora de los datos, y próximo reintento.
+- Al tocar el LED baja un desplegable con el estado, el detalle (red, API, origen y hora de los datos, y próximo reintento) y «Sincronizar ahora». Con «reducir movimiento» los ojos y los anillos no se animan.
 
 **Indicador global.** El LED está en la carcasa común (`AppShell`), así que se ve en Inicio, Catálogo, Favoritos, Equipos y Trivia, y también con Ajustes abierto. `shellStatusProvider` combina tres fuentes: el estado del servicio (`ConnectivityMonitor`), el de la sincronización (`SyncCoordinator`) y la última sync correcta del **recurso visible** en `sync_metadata` (hoy el catálogo, con `visibleResourceProvider`).
 

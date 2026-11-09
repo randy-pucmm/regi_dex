@@ -53,6 +53,10 @@ dependencies:
   connectivity_plus: 7.3.2
   clock: 1.1.3
 
+  # Imágenes fuera de la base de datos, con caché de disco acotada y LRU (ADR-004).
+  cached_network_image: 4.0.6
+  flutter_cache_manager: 3.5.0
+
   # SHA-1 del content_hash de integridad (ADR-006).
   crypto: 3.0.8
 
