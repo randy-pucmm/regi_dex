@@ -79,6 +79,19 @@ void main() {
     expect(await isCached('b'), isTrue);
   });
 
+  test('lo guardado sigue ahí tras reiniciar, sin descargar nada', () async {
+    await put('a');
+    await manager.dispose();
+
+    final restarted = RegiImageCacheManager(
+      config: Config('regidex_images_test', maxNrOfCacheObjects: 1500),
+      maxBytes: 250,
+    );
+    addTearDown(restarted.dispose);
+
+    expect(await restarted.getFileFromCache('a'), isNotNull);
+  });
+
   test(
     'emptyCache vacía todo (la base de «Borrar caché de imágenes»)',
     () async {
