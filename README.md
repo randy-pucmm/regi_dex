@@ -41,27 +41,6 @@ Dónde está cada entregable del avance y cómo se comprueba.
 | 8 | Indicador Online/Offline con texto e icono | `StatusLed` en la carcasa (`AppShell`), alimentado por `shellStatusProvider` (§11) | `shell_status_test.dart`, `app_smoke_test.dart` y `restart_offline_test.dart` |
 | 9 | Documentación inicial | Este README, con la arquitectura, la sincronización y los ADR-001 y ADR-005 completos, y el historial de commits de ambos | `git shortlog -sn` |
 
-### Guion de la demostración (Android)
-
-Se ejecuta con `flutter run` en un emulador o dispositivo Android; el paquete de la app es `com.example.regi_dex`.
-
-**Preparación.** Dispositivo con red y la app sin datos: `adb shell pm clear com.example.regi_dex` o desinstalarla. Tener abierto el Database Inspector de Android Studio.
-
-| Escenario | Pasos | Resultado esperado |
-|---|---|---|
-| **PA-01** · primera ejecución con red | Abrir la app y, sin esperar, entrar a Catálogo. | La app abre de inmediato en Inicio y se puede navegar. El LED pasa de «Verificando» a «Sincronizando» y luego a «En línea». La lista de Catálogo crece por lotes de 200 hasta los 1025 Pokémon. |
-| Preparar las imágenes | Con red, recorrer la lista de Catálogo de arriba abajo. | Los sprites quedan en la caché de disco. Sin ella, y sin red, una tarjeta muestra «Imagen no disponible offline». |
-| **PA-03** · sin conexión, con datos | Activar el modo avión (panel de ajustes rápidos, o `adb shell cmd connectivity airplane-mode enable` en Android 11 o superior) y tocar el LED. | El LED queda en «Sin conexión»; la cabecera dice «ACT. HH:mm» y el detalle «Datos locales · última sync HH:mm». «Sincronizar ahora» está deshabilitado. El catálogo sigue completo y se puede navegar. |
-| **PA-04** · reinicio sin red | Con el modo avión activo, cerrar la app del todo (quitarla de recientes) y abrirla de nuevo. | El mismo estado: catálogo completo, LED en «Sin conexión» con la hora de la última sync y ningún error. |
-| **PA-15** · instalación nueva sin red | `adb shell pm clear com.example.regi_dex`, modo avión y abrir la app. | Catálogo con «Aún no hay catálogo» y «Reintentar». Al desactivar el modo avión, la descarga arranca sola. |
-| **PA-13** · sin duplicados | Con red, tocar el LED → «Sincronizar ahora» tres veces y contar las filas en el Database Inspector. | Los conteos no cambian entre pasadas. Con los datos de PokéAPI del 7 de noviembre: `pokemon` 1025, `species` 1025, `pokemon_type` 1551, `pokemon_stat` 6150, `pokemon_ability` 2411, `species_egg_group` 1304, `type` 19, `generation` 9, `egg_group` 15 y `ability` 314. |
-
-**Si algo falla.**
-
-- PokéAPI limita a 100 llamadas por hora por IP y la app se limita a 90. Una carga completa cuesta 7 llamadas y cada «Sincronizar ahora» hasta 7. Si se agotó el presupuesto, el LED lo refleja y se reanuda pasada la hora.
-- Para forzar «Servicio no disponible» con la red activa, ver «Herramientas para la demo» en §11.
-- Conviene llegar a clase con el dispositivo ya sincronizado.
-
 ## Documentación
 
 | Documento | Contenido |
