@@ -6,10 +6,8 @@ import '../themes/regi_theme.dart';
 import '../tokens/regi_colors.dart';
 import 'hexagon_border.dart';
 
-/// Botón hexagonal de destino de Inicio (Favoritos, Trivia, Equipos).
-///
-/// Fondo oscuro con borde y texto del [color] del destino; el nombre también
-/// está escrito, así que el color no es lo único que lo identifica.
+/// Botón hexagonal de destino de Inicio. Sin [onPressed] queda deshabilitado y
+/// en gris.
 class HexButton extends StatelessWidget {
   const HexButton({
     super.key,
@@ -20,20 +18,23 @@ class HexButton extends StatelessWidget {
 
   final String label;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   static const _pointDepth = 16.0;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final enabled = onPressed != null;
+    final tone = enabled ? color : RegiInk.onShellMuted;
     final shape = HexagonBorder(
       pointAxis: Axis.horizontal,
       depth: _pointDepth,
-      side: BorderSide(color: color, width: 2),
+      side: BorderSide(color: tone, width: 2),
     );
     return Semantics(
       button: true,
+      enabled: enabled,
       label: label,
       excludeSemantics: true,
       onTap: onPressed,
@@ -51,8 +52,7 @@ class HexButton extends StatelessWidget {
                 horizontal: _pointDepth + 6,
                 vertical: 8,
               ),
-              // heightFactor: el botón mide lo que su texto, no todo el alto
-              // que le ofrezca el contenedor.
+              // heightFactor: que no se estire al alto del contenedor.
               child: Center(
                 heightFactor: 1,
                 child: FittedBox(
@@ -60,7 +60,7 @@ class HexButton extends StatelessWidget {
                   child: Text(
                     label.toUpperCase(),
                     style: text.titleSmall?.copyWith(
-                      color: color,
+                      color: tone,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1,
                     ),
@@ -75,8 +75,8 @@ class HexButton extends StatelessWidget {
   }
 }
 
-/// Hexágono con icono y nombre debajo (Ajustes). El [labelColor] debe
-/// contrastar con el fondo sobre el que se coloque.
+/// Hexágono con icono y nombre debajo; [labelColor] debe contrastar con el
+/// fondo.
 class HexIconButton extends StatelessWidget {
   const HexIconButton({
     super.key,
@@ -104,8 +104,8 @@ class HexIconButton extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       onTap: onPressed,
-      // Material propio y transparente: el `Ink` pinta sobre el Material más
-      // cercano, y el de la carcasa queda tapado por el fondo de Inicio.
+      // Material propio: el `Ink` pinta en el más cercano, que el fondo de
+      // Inicio taparía.
       child: Material(
         type: MaterialType.transparency,
         child: InkResponse(
@@ -143,9 +143,8 @@ class HexIconButton extends StatelessWidget {
   }
 }
 
-/// Botón octogonal regular de Inicio (Catálogo): cuadrado de lado [size], marco
-/// blanco con un filete del color del tema, [child] en la parte alta (los ojos
-/// LED) y el nombre en una placa hexagonal.
+/// Botón octogonal regular de Inicio: [child] arriba (los ojos) y el nombre en
+/// una placa hexagonal.
 class OctagonHubButton extends StatelessWidget {
   const OctagonHubButton({
     super.key,
@@ -158,12 +157,10 @@ class OctagonHubButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
 
-  /// Lado del cuadrado que contiene al octógono.
   final double size;
   final Widget? child;
 
-  /// Lo que entra cada esquina para que los ocho lados sean iguales:
-  /// 1 / (2 + √2) del lado.
+  /// Hace iguales los ocho lados: 1 / (2 + √2) del lado.
   static const chamferRatio = 1 / (2 + math.sqrt2);
 
   static const _outerWidth = 3.0;

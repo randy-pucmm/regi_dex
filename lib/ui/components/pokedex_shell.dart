@@ -1,55 +1,55 @@
 import 'package:flutter/material.dart';
 
 import '../themes/regi_theme.dart';
+import '../tokens/regi_colors.dart';
 import 'hexagon_border.dart';
+import 'indicator_glyph.dart';
 
-/// Punto de color con etiqueta de la cabecera (RED, API, DATOS).
+/// Marca de color con etiqueta de la cabecera (RED, API, DATOS).
 @immutable
 class ShellIndicator {
   const ShellIndicator({
     required this.label,
     required this.color,
     required this.semanticsLabel,
+    this.glyph = IndicatorGlyph.solid,
   });
 
   final String label;
   final Color color;
 
-  /// Lo que lee el lector de pantalla, p. ej. «Red: en línea».
+  /// La forma evita que el estado dependa solo del color.
+  final IndicatorGlyph glyph;
   final String semanticsLabel;
 }
 
-/// Carcasa de la Pokédex: marco con esquinas biseladas, cabecera con lente,
-/// título hexagonal y banda de estado, contenido y barra inferior.
+/// Carcasa de la Pokédex: marco biselado, cabecera con lente y título, contenido
+/// y barra inferior.
 ///
-/// La cabecera no escala por encima de 1.3× para no romper la carcasa; el
-/// contenido sí respeta el tamaño de texto del sistema.
+/// La cabecera no escala el texto por encima de 1.3× para no romper la carcasa.
 class PokedexShell extends StatelessWidget {
   const PokedexShell({
     super.key,
     required this.child,
     required this.lens,
-    required this.statusBand,
+    this.statusBand,
     this.updatedLabel,
     this.indicators = const [],
     this.bottomBar,
   });
 
-  /// Contenido de la pantalla actual.
   final Widget child;
 
-  /// Lente de la esquina superior izquierda (el LED de conectividad).
+  /// El LED de conectividad.
   final Widget lens;
 
-  /// Banda de estado bajo el título (normalmente un [ShellStatusBand]).
-  final Widget statusBand;
+  /// Banda fija bajo el título; opcional.
+  final Widget? statusBand;
 
-  /// Texto pequeño de la esquina superior, p. ej. «ACT. 10:42».
+  /// P. ej. «ACT. 10:42».
   final String? updatedLabel;
 
   final List<ShellIndicator> indicators;
-
-  /// Barra inferior opcional (el botón «Inicio» fuera de Inicio).
   final Widget? bottomBar;
 
   static const _frameWidth = 5.0;
@@ -123,7 +123,7 @@ class _Header extends StatelessWidget {
   });
 
   final Widget lens;
-  final Widget statusBand;
+  final Widget? statusBand;
   final String? updatedLabel;
   final List<ShellIndicator> indicators;
 
@@ -144,7 +144,6 @@ class _Header extends StatelessWidget {
                     updatedLabel!,
                     style: text.labelSmall?.copyWith(color: regi.onShellMuted),
                   ),
-                // Los indicadores se encogen si no caben junto a la hora.
                 Expanded(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -174,16 +173,19 @@ class _Header extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(width: 60, height: 60, child: lens),
+                SizedBox(width: 68, height: 68, child: lens),
                 const SizedBox(width: 12),
                 const Expanded(child: _Wordmark()),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            child: statusBand,
-          ),
+          if (statusBand case final band?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              child: band,
+            )
+          else
+            const SizedBox(height: 12),
         ],
       ),
     );
@@ -204,13 +206,7 @@ class _IndicatorDot extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: indicator.color,
-              shape: BoxShape.circle,
-            ),
-            child: const SizedBox(width: 9, height: 9),
-          ),
+          IndicatorMark(glyph: indicator.glyph, color: indicator.color),
           const SizedBox(width: 5),
           Text(
             indicator.label,
@@ -311,13 +307,11 @@ class _BottomBar extends StatelessWidget {
   }
 }
 
-/// Lente metálico de la cabecera. El [child] suele ser el LED de ojos.
+/// Lente metálico de la cabecera.
 class ShellLens extends StatelessWidget {
   const ShellLens({super.key, required this.child, required this.ringColor});
 
   final Widget child;
-
-  /// Color del aro interior (el del estado de conexión).
   final Color ringColor;
 
   @override
@@ -336,8 +330,8 @@ class ShellLens extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF05080A),
-            border: Border.all(color: ringColor, width: 2),
+            color: RegiLedColors.off,
+            border: Border.all(color: ringColor, width: 3),
           ),
           child: Center(child: child),
         ),
@@ -346,7 +340,7 @@ class ShellLens extends StatelessWidget {
   }
 }
 
-/// Botón hexagonal «Inicio» de la barra inferior (objetivo de 48 dp o más).
+/// Botón hexagonal «Inicio» de la barra inferior.
 class ShellHomeButton extends StatelessWidget {
   const ShellHomeButton({super.key, required this.onPressed});
 

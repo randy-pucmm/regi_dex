@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/settings/presentation/settings_dialog.dart';
 import '../ui/components/hub_buttons.dart';
+import '../ui/components/led_eyes.dart';
 import '../ui/themes/regi_theme.dart';
 import '../ui/tokens/contrast.dart';
 import '../ui/tokens/regi_colors.dart';
 import 'routes.dart';
+import 'shell_status.dart';
 
-/// Pantalla de Inicio: acceso a Catálogo, Favoritos, Equipos, Trivia y Ajustes
-/// (este último abre una ventana emergente, no una pantalla).
-class HomePage extends StatelessWidget {
+/// Pantalla de Inicio. Ajustes abre una ventana, no una pantalla.
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
-  /// Ancho útil desde el que los tres botones caben en una fila.
   static const _rowBreakpoint = 360.0;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final regi = RegiTheme.of(context);
+    final led = ref.watch(shellStatusProvider.select((status) => status.led));
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _rowBreakpoint;
@@ -66,11 +68,12 @@ class HomePage extends StatelessWidget {
                   ),
                   _HubStage(
                     size: octagon,
-                    // TODO(RD-14): los ojos LED de la Regi van en `child`.
                     child: OctagonHubButton(
                       label: 'Catálogo',
                       size: octagon,
                       onPressed: () => context.go(AppRoutes.catalog),
+                      // Los mismos ojos del LED de la cabecera, en grande.
+                      child: LedEyes(state: led, size: octagon * .485),
                     ),
                   ),
                   Expanded(
@@ -129,8 +132,7 @@ class HomePage extends StatelessWidget {
   }
 }
 
-/// Franja central de Inicio: el octógono sobre tres franjas en ángulo (marrón
-/// claro, marrón oscuro y negro) y el panel claro de abajo.
+/// Franja central de Inicio: el octógono sobre tres franjas en ángulo.
 class _HubStage extends StatelessWidget {
   const _HubStage({required this.size, required this.child});
 
@@ -158,9 +160,7 @@ class _HubStage extends StatelessWidget {
   }
 }
 
-/// Tres bordes con forma de «∧» muy abierta, centrados en el octógono:
-/// marrón claro → marrón oscuro, marrón oscuro → negro (línea blanca) y
-/// negro → panel claro (línea blanca).
+/// Tres bordes con forma de «∧» muy abierta, centrados en el octógono.
 class _HubBackdropPainter extends CustomPainter {
   const _HubBackdropPainter({
     required this.top,

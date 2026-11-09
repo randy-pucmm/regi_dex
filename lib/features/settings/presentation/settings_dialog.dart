@@ -3,27 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../ui/components/hex_choice.dart';
 import '../../../ui/components/regi_dialog.dart';
+import '../../../ui/themes/regi_theme.dart';
 import '../../../ui/tokens/regi_colors.dart';
 import '../../../ui/tokens/regi_palette.dart';
 import 'appearance_controller.dart';
 
-/// Ajustes: tema Regi, modo claro u oscuro y «Listo». Son pocos, así que es una
-/// ventana y no una pantalla; el cambio se ve en vivo en la cabecera.
+/// Ajustes en una ventana bajo la cabecera, para ver el cambio de tema en vivo.
 class SettingsDialog extends ConsumerWidget {
   const SettingsDialog({super.key});
 
-  /// Distancia desde arriba para dejar a la vista el lente y el título.
-  static const topInset = 114.0;
+  /// Alto de la cabecera de la carcasa, sin contar la barra de estado.
+  static const _headerHeight = 136.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appearance = ref.watch(appearanceProvider);
     final controller = ref.read(appearanceProvider.notifier);
+    final top = MediaQuery.paddingOf(context).top + _headerHeight;
 
     return RegiDialog(
       title: 'Ajustes',
       alignment: Alignment.topCenter,
-      insetPadding: const EdgeInsets.fromLTRB(20, topInset, 20, 16),
+      insetPadding: EdgeInsets.fromLTRB(20, top, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -44,8 +45,12 @@ class SettingsDialog extends ConsumerWidget {
                 HexChoice(
                   label: variant.displayName,
                   selected: appearance.variant == variant,
+                  // La muestra es el borde del tema en el modo actual.
                   leading: _Swatch(
-                    RegiPalette.of(variant, Brightness.light).shell,
+                    RegiTheme.forVariant(
+                      variant,
+                      Theme.of(context).brightness,
+                    ).frame,
                   ),
                   onPressed: () => controller.selectVariant(variant),
                 ),
@@ -110,7 +115,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-/// Muestra de color del tema, con aro blanco para verse sobre fondo oscuro.
+/// Muestra de color con aro blanco para verse sobre fondo oscuro.
 class _Swatch extends StatelessWidget {
   const _Swatch(this.color);
 
@@ -129,8 +134,7 @@ class _Swatch extends StatelessWidget {
   }
 }
 
-/// Abre los ajustes encima de la pantalla actual, sin oscurecer el fondo para
-/// que el cambio de tema se vea mientras se elige.
+/// Sin oscurecer el fondo, para ver el cambio mientras se elige.
 Future<void> showSettingsDialog(BuildContext context) {
   return showDialog<void>(
     context: context,

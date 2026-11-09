@@ -1,50 +1,56 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../ui/components/pokedex_shell.dart';
-import '../ui/components/shell_status_band.dart';
+import '../ui/components/status_led.dart';
+import '../ui/components/status_popover.dart';
 import '../ui/themes/regi_theme.dart';
 import 'routes.dart';
+import 'shell_status.dart';
+import 'sync_now.dart';
 
-/// Carcasa común de las pantallas: la Pokédex del kit `lib/ui` con el botón
-/// «Inicio» fuera de Inicio.
-///
-/// TODO(RD-14): el estado de la cabecera es fijo y solo visual. Cuando exista
-/// el estado de conectividad, el lente, los indicadores y la banda se
-/// construirán con él (StatusLed) en lugar de estas constantes.
-class AppShell extends StatelessWidget {
+/// Carcasa común de las pantallas. El texto del estado no está fijo: baja como
+/// un desplegable al tocar el LED.
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final regi = RegiTheme.of(context);
+    final status = ref.watch(shellStatusProvider);
     final atHome = GoRouterState.of(context).uri.path == AppRoutes.home;
+
     return PokedexShell(
-      updatedLabel: 'ACT. --:--',
+      updatedLabel: status.updatedLabel,
       indicators: [
-        ShellIndicator(
-          label: 'RED',
-          color: regi.ledOnline,
-          semanticsLabel: 'Red: conectada',
-        ),
-        ShellIndicator(
-          label: 'API',
-          color: regi.ledOnline,
-          semanticsLabel: 'API: disponible',
-        ),
-        ShellIndicator(
-          label: 'DATOS',
-          color: regi.ledOnline,
-          semanticsLabel: 'Datos: remotos',
-        ),
+        for (final indicator in status.indicators)
+          ShellIndicator(
+            label: indicator.label,
+            glyph: indicator.glyph,
+            color: indicator.tone == null
+                ? regi.onShell
+                : regi.ledColor(indicator.tone!),
+            semanticsLabel: indicator.semantics,
+          ),
       ],
-      lens: ShellLens(ringColor: regi.ledOnline, child: const SizedBox()),
-      statusBand: ShellStatusBand(
-        color: regi.ledOnline,
-        title: 'En línea',
-        subtitle: 'Datos remotos · actualizado --:--',
+      lens: StatusLed(
+        state: status.led,
+        semanticsLabel: status.semanticsLabel,
+        details: StatusDetails(
+          title: status.title,
+          subtitle: status.subtitle,
+          message: status.message,
+          rows: status.rows,
+          syncing: status.isSyncing,
+          onSyncNow: status.canSyncNow
+              ? () => unawaited(ref.read(syncNowProvider)())
+              : null,
+        ),
       ),
       bottomBar: atHome
           ? null

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../tokens/contrast.dart';
 import '../tokens/regi_colors.dart';
 
-/// Etiqueta de tipo Pokémon (ROCA, HIELO…) con el color del tipo.
-///
-/// [typeKey] es la clave de PokéAPI (`rock`, `ice`…) y [label] el nombre ya
-/// traducido. El texto se elige para superar 4.5:1 sobre el color del tipo.
-/// Si se pasa [onTap] el chip es un botón con objetivo mínimo de 48 dp.
+/// Etiqueta de tipo Pokémon. [typeKey] es la clave de PokéAPI (`rock`) y
+/// [label] el nombre traducido; con [onTap] es un botón de al menos 48 dp.
 class TypeChip extends StatelessWidget {
   const TypeChip({
     super.key,

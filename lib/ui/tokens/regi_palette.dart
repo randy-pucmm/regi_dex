@@ -15,10 +15,6 @@ enum RegiVariant {
 }
 
 /// Colores base de un tema Regi en un brillo concreto.
-///
-/// - [shell]: color de la carcasa (borde y fondos de acento de la Pokédex).
-/// - [primary]: color primario del `ColorScheme`.
-/// - [accent]: acento no textual (bordes, puntos, resaltes).
 @immutable
 class RegiSwatch {
   const RegiSwatch({
@@ -32,8 +28,7 @@ class RegiSwatch {
   final Color accent;
 }
 
-/// Tabla de paletas verificada (Arquitectura §8). Es la única fuente de
-/// colores de tema: ninguna feature define colores sueltos.
+/// Única fuente de colores de tema: ninguna feature define colores sueltos.
 abstract final class RegiPalette {
   static const Map<RegiVariant, RegiSwatch> light = {
     RegiVariant.regirock: RegiSwatch(
@@ -68,21 +63,24 @@ abstract final class RegiPalette {
     ),
   };
 
+  /// Modo oscuro = formas shiny, medidas sobre la foto normal/shiny. Regieleki
+  /// va en blanco porque en su shiny cambian los anillos, no el cuerpo
+  /// amarillo; Regigigas no sale en la foto y conserva el color del diseño.
   static const Map<RegiVariant, RegiSwatch> dark = {
     RegiVariant.regirock: RegiSwatch(
-      shell: Color(0xFF5E3418),
-      primary: Color(0xFFE6A673),
-      accent: Color(0xFFF2A35A),
+      shell: Color(0xFF5D3D2B),
+      primary: Color(0xFFE1BFA6),
+      accent: Color(0xFFCC8F6C),
     ),
     RegiVariant.regice: RegiSwatch(
-      shell: Color(0xFF1C4E6E),
-      primary: Color(0xFF8FD3F4),
-      accent: Color(0xFF6FC8EE),
+      shell: Color(0xFF1B5E8C),
+      primary: Color(0xFF8CCBEE),
+      accent: Color(0xFF38ADE6),
     ),
     RegiVariant.registeel: RegiSwatch(
-      shell: Color(0xFF39424B),
-      primary: Color(0xFFB9C3CD),
-      accent: Color(0xFFEE6B6B),
+      shell: Color(0xFF2F5A47),
+      primary: Color(0xFFBFE2D0),
+      accent: Color(0xFF7ACBA3),
     ),
     RegiVariant.regigigas: RegiSwatch(
       shell: Color(0xFF4A4130),
@@ -91,17 +89,16 @@ abstract final class RegiPalette {
     ),
     RegiVariant.regieleki: RegiSwatch(
       shell: Color(0xFF2A2A2A),
-      primary: Color(0xFFFFD84D),
-      accent: Color(0xFF3FD6E8),
+      primary: Color(0xFFC9D0D5),
+      accent: Color(0xFFEEF1F3),
     ),
     RegiVariant.regidrago: RegiSwatch(
-      shell: Color(0xFF5C1C1C),
-      primary: Color(0xFFF09A8A),
-      accent: Color(0xFFE7B04A),
+      shell: Color(0xFF2A4A68),
+      primary: Color(0xFFA9C8E4),
+      accent: Color(0xFF5A86B3),
     ),
   };
 
-  /// Paleta de [variant] para el [brightness] dado.
   static RegiSwatch of(RegiVariant variant, Brightness brightness) =>
       (brightness == Brightness.dark ? dark : light)[variant]!;
 }

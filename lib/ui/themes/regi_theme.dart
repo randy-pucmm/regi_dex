@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../tokens/led_state.dart';
 import '../tokens/regi_colors.dart';
 import '../tokens/regi_palette.dart';
 
 /// Tokens propios de la Pokédex Regi (ADR-009), como `ThemeExtension`.
-///
-/// Las features no definen colores sueltos: los leen de aquí o del
-/// `ColorScheme` del tema.
 @immutable
 class RegiTheme extends ThemeExtension<RegiTheme> {
   const RegiTheme({
@@ -24,7 +22,6 @@ class RegiTheme extends ThemeExtension<RegiTheme> {
     required this.ledSync,
   });
 
-  /// Tema Regi con los tokens de [variant] para el [brightness] dado.
   factory RegiTheme.forVariant(RegiVariant variant, Brightness brightness) {
     final swatch = RegiPalette.of(variant, brightness);
     final dark = brightness == Brightness.dark;
@@ -45,13 +42,12 @@ class RegiTheme extends ThemeExtension<RegiTheme> {
     );
   }
 
-  /// Tema Regi del [context] actual.
   static RegiTheme of(BuildContext context) =>
       Theme.of(context).extension<RegiTheme>()!;
 
   final RegiVariant variant;
 
-  /// Cuerpo de la carcasa (cabecera, barra inferior) y su texto.
+  /// Cabecera y barra inferior de la carcasa, y su texto.
   final Color shell;
   final Color onShell;
   final Color onShellMuted;
@@ -59,18 +55,24 @@ class RegiTheme extends ThemeExtension<RegiTheme> {
   /// Borde de la carcasa.
   final Color frame;
 
-  /// Fondo de la pantalla de contenido y su texto.
+  /// Fondo del contenido y su texto.
   final Color screen;
   final Color onScreen;
 
   /// Acento no textual: bordes, chips de filtro, puntos.
   final Color accent;
 
-  /// Colores del LED por estado de conectividad.
   final Color ledOnline;
   final Color ledOffline;
   final Color ledDown;
   final Color ledSync;
+
+  Color ledColor(LedState state) => switch (state) {
+    LedState.online => ledOnline,
+    LedState.offline => ledOffline,
+    LedState.down => ledDown,
+    LedState.sync => ledSync,
+  };
 
   @override
   RegiTheme copyWith({
