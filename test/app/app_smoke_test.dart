@@ -9,7 +9,11 @@ import 'package:regi_dex/app/shell_status.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
+import 'package:regi_dex/features/favorites/presentation/favorites_page.dart';
+import 'package:regi_dex/features/pokemon/presentation/catalog_page.dart';
 import 'package:regi_dex/features/settings/presentation/settings_dialog.dart';
+import 'package:regi_dex/features/team_builder/presentation/team_builder_page.dart';
+import 'package:regi_dex/features/trivia/presentation/trivia_page.dart';
 import 'package:regi_dex/ui/components/hex_choice.dart';
 import 'package:regi_dex/ui/components/hub_buttons.dart';
 import 'package:regi_dex/ui/components/led_eyes.dart';
@@ -27,6 +31,13 @@ import '../helpers/ui_test_helpers.dart';
 
 /// Destinos de Inicio que abren una pantalla (Ajustes abre una ventana).
 const _screens = ['Catálogo', 'Favoritos', 'Equipos', 'Trivia'];
+
+final _screenPages = <String, Type>{
+  'Catálogo': CatalogPage,
+  'Favoritos': FavoritesPage,
+  'Equipos': TeamBuilderPage,
+  'Trivia': TriviaPage,
+};
 
 /// Conexión estable por defecto: PokéAPI responde por Wi-Fi.
 const _online = ConnectivitySnapshot(
@@ -113,7 +124,7 @@ void main() {
     for (final label in _screens) {
       await tester.tap(_hubButton(label));
       await tester.pumpAndSettle();
-      expect(find.text(label), findsOneWidget);
+      expect(find.byType(_screenPages[label]!), findsOneWidget);
       expect(_hubButton(label), findsNothing);
 
       await tester.tap(find.text('Inicio'));
@@ -309,7 +320,7 @@ void main() {
       await tester.tapAt(const Offset(4, 840));
       await tester.pumpAndSettle();
       expect(find.text('EN LÍNEA'), findsNothing, reason: label);
-      expect(find.text(label), findsOneWidget, reason: label);
+      expect(find.byType(_screenPages[label]!), findsOneWidget, reason: label);
 
       await tester.tap(find.text('Inicio'));
       await tester.pumpAndSettle();
