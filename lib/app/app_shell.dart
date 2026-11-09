@@ -8,9 +8,9 @@ import '../ui/components/pokedex_shell.dart';
 import '../ui/components/status_led.dart';
 import '../ui/components/status_popover.dart';
 import '../ui/themes/regi_theme.dart';
-import 'providers.dart';
 import 'routes.dart';
 import 'shell_status.dart';
+import 'sync_now.dart';
 
 /// Carcasa común de las pantallas. El texto del estado no está fijo: baja como
 /// un desplegable al tocar el LED.
@@ -47,11 +47,8 @@ class AppShell extends ConsumerWidget {
           message: status.message,
           rows: status.rows,
           syncing: status.isSyncing,
-          // Por ahora solo vuelve a comprobar PokéAPI; la descarga del
-          // catálogo se suma con RD-17.
           onSyncNow: status.canSyncNow
-              ? () =>
-                    unawaited(ref.read(connectivityMonitorProvider).checkNow())
+              ? () => unawaited(ref.read(syncNowProvider)())
               : null,
         ),
       ),

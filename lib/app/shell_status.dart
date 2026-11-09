@@ -5,22 +5,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/connectivity/service_status.dart';
 import '../core/error/failure.dart';
 import '../core/sync/sync_status.dart';
+import '../features/pokemon/data/catalog_sync.dart';
 import '../ui/components/indicator_glyph.dart';
 import '../ui/components/status_popover.dart';
 import '../ui/tokens/led_state.dart';
 import 'providers.dart';
 
-/// Hora de la última sync correcta de cualquier recurso; null si no hubo.
+/// Clave de `sync_metadata` del recurso cuya sync describe el indicador (PS-09).
+/// Hoy es siempre el catálogo; cuando haya pantallas con datos propios
+/// (Equipos con `champions`, Detalle con `detail:{id}`) seguirá a la ruta.
+final visibleResourceProvider = Provider<String>(
+  (ref) => CatalogSync.resourceKey,
+);
+
+/// Hora de la última sync correcta del recurso visible; null si no hubo. Una
+/// sync más reciente de otro recurso no cuenta: si la referencia se actualiza
+/// pero el catálogo falla, el indicador no debe decir que está al día.
 final lastSyncAtProvider = StreamProvider<DateTime?>((ref) {
   final dao = ref.watch(appDatabaseProvider).syncMetadataDao;
-  return dao.watchAll().map((rows) {
-    DateTime? latest;
-    for (final row in rows) {
-      final at = row.lastSuccessAt;
-      if (at != null && (latest == null || at.isAfter(latest))) latest = at;
-    }
-    return latest;
-  });
+  final resourceKey = ref.watch(visibleResourceProvider);
+  return dao.watchEntry(resourceKey).map((row) => row?.lastSuccessAt);
 });
 
 final shellStatusProvider = Provider<ShellStatus>((ref) {
