@@ -205,6 +205,12 @@ El estado del servicio se decide con un **health-check real contra PokéAPI**, n
 - El ping se envía al cambiar la red, al reintentar tras una caída (2 s × 2 con jitter, hasta 5 intentos) y tras 10 min sin tráfico. Una consulta exitosa cuenta como health-check.
 - Al tocar el LED se ve el detalle: red, API, origen y hora de los datos, y próximo reintento.
 
+**Indicador global.** El LED está en la carcasa común (`AppShell`), así que se ve en Inicio, Catálogo, Favoritos, Equipos y Trivia, y también con Ajustes abierto. `shellStatusProvider` combina tres fuentes: el estado del servicio (`ConnectivityMonitor`), el de la sincronización (`SyncCoordinator`) y la última sync correcta del **recurso visible** en `sync_metadata` (hoy el catálogo, con `visibleResourceProvider`).
+
+- **Origen y hora.** En línea dice «Datos remotos · actualizado HH:mm»; sin conexión o con la API caída, «Datos locales · última sync HH:mm». La cabecera muestra la misma hora como «ACT. HH:mm». Una sync más reciente de otro recurso, como la referencia, no cambia esa hora.
+- **Sincronizar ahora.** Está en el detalle del LED, activo en línea o con el servicio caído. Vuelve a comprobar PokéAPI y luego sincroniza el catálogo; si ya hay una pasada en curso la reutiliza. Puede gastar hasta 7 llamadas del presupuesto.
+- **Reinicio sin red.** La hora sale de `sync_metadata`, que persiste, así que el indicador muestra «Sin conexión · Datos locales · última sync HH:mm» sin llamar a PokéAPI y los datos descargados siguen disponibles (PA-03, PA-04).
+
 **Herramientas para la demo.** Ajustes → Depuración → **Simular API caída** permite demostrar PA-08 con la red activa.
 
 También se puede probar desde la consola: `flutter run --dart-define=POKEAPI_ENDPOINT=https://graphql.pokeapi.co/__regidex_down__` deja la red activa y la API sin respuesta.
