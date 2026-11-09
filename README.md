@@ -18,10 +18,28 @@ Ambos trabajamos en todas las capas y revisamos el código del otro mediante pul
 | Hito | Fecha | Estado |
 |---|---|---|
 | Sprint 0: documentación, diagramas y planificación | 23–26 oct 2026 | ✅ Completado |
-| Entrega de **Avance** (≈40 %) | 11 nov 2026 | ⏳ En curso |
+| Sprint 1: fundaciones (estructura, DI, Drift, cliente GraphQL, monitor de conectividad, kit UI) | 27 oct – 2 nov 2026 | ✅ Completado |
+| Sprint 2: catálogo offline (sync paginada, repositorio, lista observada, indicador de conexión) | 3–10 nov 2026 | ✅ Completado |
+| Entrega de **Avance** (≈40 %) | 11 nov 2026 | ⏳ Preparada; se demuestra en clase |
 | **Entrega final** y defensa | 30 nov 2026 | ⏳ Pendiente |
 
-Las secciones marcadas como *planificado* describen el diseño acordado y se actualizarán a medida que avance la implementación.
+Lo que todavía no está implementado se marca como *planificado* en cada sección.
+
+## Avance del 11 de noviembre
+
+Dónde está cada entregable del avance y cómo se comprueba.
+
+| # | Entregable | Dónde está | Cómo se comprueba |
+|---|---|---|---|
+| 1 | Estructura por funcionalidades con capas | `lib/features/<feature>/{presentation, domain, data}`, más `lib/core/` y `lib/ui/` (§6) | `test/architecture/layer_rules_test.dart` impone las reglas de dependencia entre capas |
+| 2 | Modelo de datos local | Drift v1 con 17 tablas: referencia, catálogo, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquema en `drift_schemas/drift_schema_v1.json`) | `test/core/database/` |
+| 3 | GraphQL con paginación y sin duplicados | `CatalogSync`: lotes de 200 con upsert por clave primaria (`lib/features/pokemon/data/catalog_sync.dart`) | `catalog_sync_test.dart`: tres sincronizaciones seguidas dejan los mismos conteos (PA-13) e interrumpir y reanudar no pierde ni repite filas (PA-09). Corrida real contra PokéAPI el 7 de noviembre: 1025 Pokémon, y la segunda pasada con los mismos conteos |
+| 4 | Fuente de lectura local | `PokemonRepository` (contrato en `domain`) sobre Drift; la pantalla solo observa `catalogStateProvider` | `layer_rules_test.dart`: `presentation` no importa GraphQL, Drift ni DTOs; `pokemon_repository_test.dart` |
+| 5 | Interfaz sin bloqueos | `main()` solo hace `runApp`; la sync arranca sin esperarla (`catalogAutoSyncProvider`) y el mapeo de cada lote corre en un isolate | `catalog_auto_sync_test.dart` y `pokemon_mapper_test.dart` (paso por isolate) |
+| 6 | Catálogo funcional | `catalog_page.dart` y `pokemon_tile.dart`: nombre, número, imagen y tipos; estados `CatalogLoading`, `CatalogLoaded`, `CatalogEmpty` y `CatalogError`, con «Reintentar» | `catalog_page_test.dart`, `catalog_state_test.dart` y `pokemon_tile_test.dart` |
+| 7 | Offline, también tras reiniciar | Lectura siempre desde Drift; `sync_metadata` guarda la última sync; las imágenes van a una caché de disco | `test/app/restart_offline_test.dart` (PA-03, PA-04) y `pokemon_repository_test.dart` |
+| 8 | Indicador Online/Offline con texto e icono | `StatusLed` en la carcasa (`AppShell`), alimentado por `shellStatusProvider` (§11) | `shell_status_test.dart`, `app_smoke_test.dart` y `restart_offline_test.dart` |
+| 9 | Documentación inicial | Este README, con la arquitectura, la sincronización y los ADR-001 y ADR-005 completos, y el historial de commits de ambos | `git shortlog -sn` |
 
 ## Documentación
 
@@ -46,7 +64,7 @@ Todo funciona **con o sin conexión**: la interfaz siempre se construye desde la
 
 **Lo propio de nuestra versión:**
 
-- Interfaz de **Pokédex moderna**. El lente superior es el **LED** del indicador global de conexión: se reconoce por su color, y al tocarlo muestra un *tooltip* con el detalle.
+- Interfaz de **Pokédex moderna**. El lente superior es el **LED** del indicador global de conexión: se reconoce por su color, y al tocarlo baja un desplegable con el detalle.
 - **Seis temas** inspirados en los Regis: Regirock, Regice, Registeel, Regigigas, Regieleki y Regidrago, en claro y oscuro.
 - **Búsqueda por nombre o número nacional** («25», «#025» o «pika»).
 - **Filtros** por tipo, generación, **grupo huevo** y habilidad, con orden por nombre, número o total base.
@@ -78,22 +96,21 @@ dart run build_runner build   # genera el código de Drift (los *.g.dart no se v
 flutter run
 ```
 
-## 4. Tecnologías y justificación (*planificado*)
+## 4. Tecnologías y justificación
 
-| Paquete | Uso | Justificación |
-|---|---|---|
-| `flutter_riverpod` | Estado e inyección de dependencias | Providers testeables y sustituibles; encaja con los streams de Drift (ADR-002). |
-| `drift` + `drift_flutter` | Persistencia local | SQL tipado, consultas reactivas, transacciones y migraciones (ADR-001). |
-| `graphql` | Cliente GraphQL | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
-| `http` | Transporte HTTP | Cliente del enlace GraphQL: fija el timeout de conexión y permite simular el servidor en las pruebas. |
-| `connectivity_plus` | Eventos de red | Disparador del health-check contra PokéAPI (ADR-007). |
-| `clock` · `fake_async` (dev) | Reloj | Reloj inyectable y reloj falso para probar la histéresis y los reintentos sin esperas reales. |
-| `crypto` | Integridad | SHA-1 del `content_hash` de cada Pokémon (ADR-006). |
-| `cached_network_image` + `flutter_cache_manager` | Imágenes | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
-| `go_router` | Navegación | Rutas declarativas: pantalla de Inicio con los cinco destinos del rediseño y un shell común. |
-| `freezed` + `json_serializable` | Modelos | Entidades inmutables, estados sellados y DTOs. |
-| `crypto` | Integridad | `content_hash` para detectar datos alterados (ADR-006). |
-| `fl_chart` · `share_plus` · `intl` | UI | Gráfico de estadísticas, compartir, i18n es/en. |
+| Paquete | Uso | Estado | Justificación |
+|---|---|---|---|
+| `flutter_riverpod` | Estado e inyección de dependencias | Implementado | Providers testeables y sustituibles; encaja con los streams de Drift (ADR-002). |
+| `drift` + `drift_flutter` | Persistencia local | Implementado | SQL tipado, consultas reactivas, transacciones y migraciones (ADR-001). |
+| `graphql` | Cliente GraphQL | Implementado | Cliente Dart puro; lo usamos sin caché porque la fuente de verdad es Drift (ADR-003). |
+| `http` | Transporte HTTP | Implementado | Cliente del enlace GraphQL: fija el timeout de conexión y permite simular el servidor en las pruebas. |
+| `connectivity_plus` | Eventos de red | Implementado | Disparador del health-check contra PokéAPI (ADR-007). |
+| `clock` · `fake_async` (dev) | Reloj | Implementado | Reloj inyectable y reloj falso para probar la histéresis y los reintentos sin esperas reales. |
+| `crypto` | Integridad | Implementado | SHA-1 del `content_hash` de cada Pokémon (ADR-006). La verificación contra PokéAPI llega en la entrega final. |
+| `cached_network_image` + `flutter_cache_manager` | Imágenes | Implementado | Caché de disco LRU acotada; las imágenes no van a la BD (ADR-004). |
+| `go_router` | Navegación | Implementado | Rutas declarativas: pantalla de Inicio con los destinos del rediseño y una carcasa común. |
+| `freezed` + `json_serializable` | Modelos | Planificado | Hoy las entidades, los DTOs y los estados sellados están escritos a mano. |
+| `fl_chart` · `share_plus` · `intl` | UI | Planificado | Gráfico de estadísticas, tarjeta compartible e internacionalización es/en (ADR-011). |
 
 ## 5. Arquitectura
 
@@ -111,12 +128,34 @@ Clean Architecture **por funcionalidades**: `presentation` → `domain` ← `dat
 
 ```text
 lib/
-├── app/        # bootstrap, DI, router
-├── core/       # network, connectivity, database, sync, images, error
-├── ui/         # sistema de diseño Regi: tokens, temas, componentes Pokédex
-├── features/   # pokemon · favorites · trivia · team_builder · settings
-│   └── <feature>/{presentation, domain, data}
-└── l10n/       # app_es.arb · app_en.arb
+├── main.dart                  # runApp(ProviderScope(RegiDexApp)); no espera a la red
+├── app/                       # arranque, inyección de dependencias y router
+│   ├── app.dart               # MaterialApp.router con el tema Regi; mantiene vivos el monitor y la sync automática
+│   ├── app_shell.dart         # carcasa común con el LED, presente en todas las pantallas
+│   ├── providers.dart         # providers raíz: BD, cliente GraphQL, presupuesto, monitor, coordinador, repositorio
+│   ├── catalog_auto_sync.dart # sincroniza el catálogo al abrir y al reconectar, si hace falta
+│   ├── sync_now.dart          # «Sincronizar ahora»: comprueba PokéAPI y sincroniza
+│   ├── shell_status.dart      # compone conectividad, sync y última sync en el estado del LED
+│   └── image_providers.dart · router.dart · routes.dart · home_page.dart
+├── core/                      # infraestructura compartida
+│   ├── network/               # cliente GraphQL, operaciones .graphql y traducción de errores a Failure
+│   ├── connectivity/          # monitor con health-check e histéresis, y ServiceStatus
+│   ├── database/              # Drift: tablas, DAOs y app_database
+│   ├── sync/                  # SyncCoordinator (single-flight), ApiBudget (90/h), BackoffPolicy y SyncStatus
+│   ├── images/                # caché de imágenes en disco, LRU de 150 MB y 1500 archivos
+│   └── error/                 # jerarquía sellada de Failure
+├── features/
+│   ├── pokemon/               # el catálogo, completo en las tres capas
+│   │   ├── domain/            # Pokemon, PokemonQuery, PokemonRepository y los casos de uso WatchPokemon y RefreshCatalog
+│   │   ├── data/              # CatalogSync, fuente remota, DTOs, mapeo a filas, content_hash y repositorio
+│   │   └── presentation/      # catalog_page, catalog_state (estados sellados) y pokemon_tile
+│   ├── settings/              # ventana de Ajustes: tema y modo
+│   └── favorites · trivia · team_builder   # solo la pantalla provisional; llegan en la entrega final
+├── ui/                        # sistema de diseño Regi: tokens, temas, carcasa Pokédex, LED, chips y barras
+└── l10n/                      # app_es.arb · app_en.arb (planificado)
+test/                          # espejo de lib/, más test/architecture con las reglas de capas
+drift_schemas/                 # volcado del esquema de Drift v1
+assets/fonts/                  # Chakra Petch y Figtree (licencia OFL)
 ```
 
 ## 7. Estrategia Offline-First
@@ -213,9 +252,7 @@ El estado del servicio se decide con un **health-check real contra PokéAPI**, n
 - **Sincronizar ahora.** Está en el detalle del LED, activo en línea o con el servicio caído. Vuelve a comprobar PokéAPI y luego sincroniza el catálogo; si ya hay una pasada en curso la reutiliza. Puede gastar hasta 7 llamadas del presupuesto.
 - **Reinicio sin red.** La hora sale de `sync_metadata`, que persiste, así que el indicador muestra «Sin conexión · Datos locales · última sync HH:mm» sin llamar a PokéAPI y los datos descargados siguen disponibles (PA-03, PA-04).
 
-**Herramientas para la demo.** Ajustes → Depuración → **Simular API caída** permite demostrar PA-08 con la red activa.
-
-También se puede probar desde la consola: `flutter run --dart-define=POKEAPI_ENDPOINT=https://graphql.pokeapi.co/__regidex_down__` deja la red activa y la API sin respuesta.
+**Herramientas para la demo.** Para demostrar PA-08 (servicio no disponible con la red activa) se usa la consola: `flutter run --dart-define=POKEAPI_ENDPOINT=https://graphql.pokeapi.co/__regidex_down__` deja la red activa y la API sin respuesta. El interruptor **Ajustes → Depuración → Simular API caída** está *planificado* (RD-30) y todavía no existe.
 
 ![Estados de conectividad](docs/diagrams/D07_estados_conectividad.png)
 
@@ -243,21 +280,42 @@ También se puede probar desde la consola: `flutter run --dart-define=POKEAPI_EN
 
 ## Decisiones de arquitectura (ADR)
 
-El texto completo de cada ADR (contexto, decisión, alternativas y consecuencias) está en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§11).
+Aquí van completos los dos ADR que ya están implementados en el código del Avance. El texto de los once (contexto, decisión, alternativas y consecuencias) está en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§11).
 
-| ADR | Decisión | Responsable |
-|---|---|---|
-| ADR-001 | Drift (SQLite) como fuente de verdad observable | Randy |
-| ADR-002 | Riverpod para estado e inyección de dependencias | Rafael |
-| ADR-003 | Cliente `graphql` sin caché normalizada y DTOs propios | Randy |
-| ADR-004 | Imágenes fuera de la base de datos (caché LRU y favoritos fijados) | Rafael |
-| ADR-005 | Presupuesto de llamadas a PokéAPI (≤ 90/h) | Randy |
-| ADR-006 | Detección de alteraciones locales con hash de contenido | Randy |
-| ADR-007 | Monitor de conectividad con health-check e histéresis | Randy |
-| ADR-008 | Champions Battle Data como fuente secundaria | Randy |
-| ADR-009 | Sistema de diseño Regi sobre Material 3 | Rafael |
-| ADR-010 | Simulador de caída de API e inspector de BD | Rafael |
-| ADR-011 | Internacionalización con ARB (es/en) | Rafael |
+| ADR | Decisión | Responsable | Implementación |
+|---|---|---|---|
+| [ADR-001](#adr-001--drift-sqlite-como-fuente-de-verdad-observable) | Drift (SQLite) como fuente de verdad observable | Randy | Implementado |
+| ADR-002 | Riverpod para estado e inyección de dependencias | Rafael | Implementado |
+| ADR-003 | Cliente `graphql` sin caché normalizada y DTOs propios | Randy | Implementado |
+| ADR-004 | Imágenes fuera de la base de datos (caché LRU y favoritos fijados) | Rafael | Parcial: la caché LRU; los favoritos fijados llegan con RD-25 |
+| [ADR-005](#adr-005--presupuesto-de-llamadas-a-pokéapi) | Presupuesto de llamadas a PokéAPI (≤ 90/h) | Randy | Implementado |
+| ADR-006 | Detección de alteraciones locales con hash de contenido | Randy | Parcial: el hash se calcula y se guarda; la verificación llega con RD-29 |
+| ADR-007 | Monitor de conectividad con health-check e histéresis | Randy | Implementado |
+| ADR-008 | Champions Battle Data como fuente secundaria | Randy | Planificado (RD-35) |
+| ADR-009 | Sistema de diseño Regi sobre Material 3 | Rafael | Implementado |
+| ADR-010 | Simulador de caída de API e inspector de BD | Rafael | Planificado (RD-30) |
+| ADR-011 | Internacionalización con ARB (es/en) | Rafael | Planificado (RD-33) |
+
+### ADR-001 · Drift (SQLite) como fuente de verdad observable
+
+- **Estado:** Aceptado (23-oct-2026) · **Responsable:** Randy
+- **Contexto:** OF-16 exige una persistencia estructurada y consultable, con búsquedas y filtros offline, transacciones y migraciones.
+- **Decisión:** Drift sobre SQLite. Los DAOs exponen `Stream`s que la UI observa por medio de los repositorios.
+- **Alternativas:** Isar o Hive (NoSQL, filtros relacionales más torpes, futuro de mantenimiento incierto); `sqflite` puro (sin tipos ni streams); caché del cliente GraphQL (no cumple OF-16).
+- **Consecuencias:** Requiere generación de código (`build_runner`) y diseño de esquema. A cambio da SQL verificable, índices, transacciones (RNF-RES-04) y compatibilidad con el Database Inspector.
+
+### ADR-005 · Presupuesto de llamadas a PokéAPI
+
+- **Estado:** Aceptado · **Responsable:** Randy
+- **Contexto:** PokéAPI GraphQL permite 100 llamadas por hora por IP y banea a quien abusa. La app hace health-checks, carga inicial, detalle y verificación de integridad.
+- **Decisión:**
+  - Un `ApiBudget` con ventana móvil de 60 min y tope de **90** llamadas.
+  - Lotes de 200 y un solo request por detalle (incluida la cadena evolutiva).
+  - Las consultas exitosas cuentan como health-check.
+  - Ante un 429 se pausa según `Retry-After`.
+  - Prioridad: interacción del usuario > integridad > refresco periódico.
+- **Alternativas:** Sin control (riesgo de ban en plena demo); REST de PokéAPI (no cumple el requisito de GraphQL).
+- **Consecuencias:** El refresco periódico puede posponerse. La carga inicial completa cuesta 7 llamadas.
 
 ## Cronograma
 
