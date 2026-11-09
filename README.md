@@ -301,21 +301,42 @@ El estado del servicio se decide con un **health-check real contra PokéAPI**, n
 
 ## Decisiones de arquitectura (ADR)
 
-El texto completo de cada ADR (contexto, decisión, alternativas y consecuencias) está en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§11).
+Aquí van completos los dos ADR que ya están implementados en el código del Avance. El texto de los once (contexto, decisión, alternativas y consecuencias) está en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§11).
 
-| ADR | Decisión | Responsable |
-|---|---|---|
-| ADR-001 | Drift (SQLite) como fuente de verdad observable | Randy |
-| ADR-002 | Riverpod para estado e inyección de dependencias | Rafael |
-| ADR-003 | Cliente `graphql` sin caché normalizada y DTOs propios | Randy |
-| ADR-004 | Imágenes fuera de la base de datos (caché LRU y favoritos fijados) | Rafael |
-| ADR-005 | Presupuesto de llamadas a PokéAPI (≤ 90/h) | Randy |
-| ADR-006 | Detección de alteraciones locales con hash de contenido | Randy |
-| ADR-007 | Monitor de conectividad con health-check e histéresis | Randy |
-| ADR-008 | Champions Battle Data como fuente secundaria | Randy |
-| ADR-009 | Sistema de diseño Regi sobre Material 3 | Rafael |
-| ADR-010 | Simulador de caída de API e inspector de BD | Rafael |
-| ADR-011 | Internacionalización con ARB (es/en) | Rafael |
+| ADR | Decisión | Responsable | Implementación |
+|---|---|---|---|
+| [ADR-001](#adr-001--drift-sqlite-como-fuente-de-verdad-observable) | Drift (SQLite) como fuente de verdad observable | Randy | Implementado |
+| ADR-002 | Riverpod para estado e inyección de dependencias | Rafael | Implementado |
+| ADR-003 | Cliente `graphql` sin caché normalizada y DTOs propios | Randy | Implementado |
+| ADR-004 | Imágenes fuera de la base de datos (caché LRU y favoritos fijados) | Rafael | Parcial: la caché LRU; los favoritos fijados llegan con RD-25 |
+| [ADR-005](#adr-005--presupuesto-de-llamadas-a-pokéapi) | Presupuesto de llamadas a PokéAPI (≤ 90/h) | Randy | Implementado |
+| ADR-006 | Detección de alteraciones locales con hash de contenido | Randy | Parcial: el hash se calcula y se guarda; la verificación llega con RD-29 |
+| ADR-007 | Monitor de conectividad con health-check e histéresis | Randy | Implementado |
+| ADR-008 | Champions Battle Data como fuente secundaria | Randy | Planificado (RD-35) |
+| ADR-009 | Sistema de diseño Regi sobre Material 3 | Rafael | Implementado |
+| ADR-010 | Simulador de caída de API e inspector de BD | Rafael | Planificado (RD-30) |
+| ADR-011 | Internacionalización con ARB (es/en) | Rafael | Planificado (RD-33) |
+
+### ADR-001 · Drift (SQLite) como fuente de verdad observable
+
+- **Estado:** Aceptado (23-oct-2026) · **Responsable:** Randy
+- **Contexto:** OF-16 exige una persistencia estructurada y consultable, con búsquedas y filtros offline, transacciones y migraciones.
+- **Decisión:** Drift sobre SQLite. Los DAOs exponen `Stream`s que la UI observa por medio de los repositorios.
+- **Alternativas:** Isar o Hive (NoSQL, filtros relacionales más torpes, futuro de mantenimiento incierto); `sqflite` puro (sin tipos ni streams); caché del cliente GraphQL (no cumple OF-16).
+- **Consecuencias:** Requiere generación de código (`build_runner`) y diseño de esquema. A cambio da SQL verificable, índices, transacciones (RNF-RES-04) y compatibilidad con el Database Inspector.
+
+### ADR-005 · Presupuesto de llamadas a PokéAPI
+
+- **Estado:** Aceptado · **Responsable:** Randy
+- **Contexto:** PokéAPI GraphQL permite 100 llamadas por hora por IP y banea a quien abusa. La app hace health-checks, carga inicial, detalle y verificación de integridad.
+- **Decisión:**
+  - Un `ApiBudget` con ventana móvil de 60 min y tope de **90** llamadas.
+  - Lotes de 200 y un solo request por detalle (incluida la cadena evolutiva).
+  - Las consultas exitosas cuentan como health-check.
+  - Ante un 429 se pausa según `Retry-After`.
+  - Prioridad: interacción del usuario > integridad > refresco periódico.
+- **Alternativas:** Sin control (riesgo de ban en plena demo); REST de PokéAPI (no cumple el requisito de GraphQL).
+- **Consecuencias:** El refresco periódico puede posponerse. La carga inicial completa cuesta 7 llamadas.
 
 ## Cronograma
 
