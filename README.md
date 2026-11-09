@@ -18,10 +18,28 @@ Ambos trabajamos en todas las capas y revisamos el código del otro mediante pul
 | Hito | Fecha | Estado |
 |---|---|---|
 | Sprint 0: documentación, diagramas y planificación | 23–26 oct 2026 | ✅ Completado |
-| Entrega de **Avance** (≈40 %) | 11 nov 2026 | ⏳ En curso |
+| Sprint 1: fundaciones (estructura, DI, Drift, cliente GraphQL, monitor de conectividad, kit UI) | 27 oct – 2 nov 2026 | ✅ Completado |
+| Sprint 2: catálogo offline (sync paginada, repositorio, lista observada, indicador de conexión) | 3–10 nov 2026 | ✅ Completado |
+| Entrega de **Avance** (≈40 %) | 11 nov 2026 | ⏳ Preparada; se demuestra en clase |
 | **Entrega final** y defensa | 30 nov 2026 | ⏳ Pendiente |
 
-Las secciones marcadas como *planificado* describen el diseño acordado y se actualizarán a medida que avance la implementación.
+Lo que todavía no está implementado se marca como *planificado* en cada sección.
+
+## Avance del 11 de noviembre
+
+Dónde está cada entregable del avance y cómo se comprueba.
+
+| # | Entregable | Dónde está | Cómo se comprueba |
+|---|---|---|---|
+| 1 | Estructura por funcionalidades con capas | `lib/features/<feature>/{presentation, domain, data}`, más `lib/core/` y `lib/ui/` (§6) | `test/architecture/layer_rules_test.dart` impone las reglas de dependencia entre capas |
+| 2 | Modelo de datos local | Drift v1 con 17 tablas: referencia, catálogo, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquema en `drift_schemas/drift_schema_v1.json`) | `test/core/database/` |
+| 3 | GraphQL con paginación y sin duplicados | `CatalogSync`: lotes de 200 con upsert por clave primaria (`lib/features/pokemon/data/catalog_sync.dart`) | `catalog_sync_test.dart`: tres sincronizaciones seguidas dejan los mismos conteos (PA-13) e interrumpir y reanudar no pierde ni repite filas (PA-09). Corrida real contra PokéAPI el 7 de noviembre: 1025 Pokémon, y la segunda pasada con los mismos conteos |
+| 4 | Fuente de lectura local | `PokemonRepository` (contrato en `domain`) sobre Drift; la pantalla solo observa `catalogStateProvider` | `layer_rules_test.dart`: `presentation` no importa GraphQL, Drift ni DTOs; `pokemon_repository_test.dart` |
+| 5 | Interfaz sin bloqueos | `main()` solo hace `runApp`; la sync arranca sin esperarla (`catalogAutoSyncProvider`) y el mapeo de cada lote corre en un isolate | `catalog_auto_sync_test.dart` y `pokemon_mapper_test.dart` (paso por isolate) |
+| 6 | Catálogo funcional | `catalog_page.dart` y `pokemon_tile.dart`: nombre, número, imagen y tipos; estados `CatalogLoading`, `CatalogLoaded`, `CatalogEmpty` y `CatalogError`, con «Reintentar» | `catalog_page_test.dart`, `catalog_state_test.dart` y `pokemon_tile_test.dart` |
+| 7 | Offline, también tras reiniciar | Lectura siempre desde Drift; `sync_metadata` guarda la última sync; las imágenes van a una caché de disco | `test/app/restart_offline_test.dart` (PA-03, PA-04) y `pokemon_repository_test.dart` |
+| 8 | Indicador Online/Offline con texto e icono | `StatusLed` en la carcasa (`AppShell`), alimentado por `shellStatusProvider` (§11) | `shell_status_test.dart`, `app_smoke_test.dart` y `restart_offline_test.dart` |
+| 9 | Documentación inicial | Este README, con la arquitectura, la sincronización y los ADR-001 y ADR-005 completos, y el historial de commits de ambos | `git shortlog -sn` |
 
 ## Documentación
 
