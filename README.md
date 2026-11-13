@@ -57,7 +57,7 @@ Todo funciona **con o sin conexión**: la interfaz siempre se construye desde la
   - Sugerencias según el uso real en la escalera.
   - Exportación en formato Showdown.
 
-![Mockup del indicador en sus cuatro estados](docs/assets/M01_pokedex_indicador.png)
+![Mockup del indicador en sus cuatro estados](docs/assets/MR01_pokedex_indicador.png)
 
 ## 2. Requisitos de ejecución
 
@@ -229,7 +229,7 @@ También se puede probar desde la consola: `flutter run --dart-define=POKEAPI_EN
 | Filtro por grupo huevo | Combinable con tipo, generación y habilidad. |
 | Pokémon Card | Tarjeta compartible como imagen. |
 
-![Temas Regi](docs/assets/M02_temas_regi.png)
+![Temas Regi](docs/assets/MR02_temas_regi.png)
 
 ## 13. Limitaciones conocidas
 
