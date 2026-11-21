@@ -29,6 +29,11 @@ class PokemonRemoteSource {
     'offset': offset,
   });
 
+  /// GetPokemonDetail: el detalle completo de [id], con su cadena evolutiva,
+  /// en una sola llamada. Entrega la lista `pokemon` (0 o 1 elemento).
+  Future<Map<String, dynamic>> fetchDetail(int id) =>
+      _call(GraphqlOperation.getPokemonDetail, {'id': id, 'langs': languages});
+
   Future<Map<String, dynamic>> _call(
     GraphqlOperation operation,
     Map<String, dynamic> variables,

@@ -17,6 +17,24 @@ class FakePokemonRemote implements PokemonRemoteSource {
   /// Permite alterar la página antes de entregarla.
   void Function(Map<String, dynamic> page)? tamper;
 
+  /// Ids pedidos con [fetchDetail], en orden.
+  final detailIds = <int>[];
+
+  /// Falla [fetchDetail] con [NetworkFailure] mientras sea true.
+  var failDetail = false;
+
+  /// Permite alterar el detalle antes de entregarlo.
+  void Function(Map<String, dynamic> detail)? tamperDetail;
+
+  @override
+  Future<Map<String, dynamic>> fetchDetail(int id) async {
+    detailIds.add(id);
+    if (failDetail) throw const NetworkFailure();
+    final detail = syntheticDetail(id);
+    tamperDetail?.call(detail);
+    return detail;
+  }
+
   @override
   Future<Map<String, dynamic>> fetchReference() async {
     referenceCalls++;

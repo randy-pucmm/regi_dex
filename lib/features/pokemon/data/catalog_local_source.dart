@@ -2,6 +2,8 @@ import 'package:clock/clock.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/sync/sync_coordinator.dart';
+import 'content_hash.dart';
+import 'pokemon_detail_mapper.dart';
 import 'pokemon_mapper.dart';
 
 /// Escritura y lectura del catálogo en Drift para la sincronización.
@@ -35,6 +37,59 @@ class CatalogLocalSource {
         versionGroups: records.versionGroups,
         typeEfficacies: records.typeEfficacies,
       );
+
+  /// Pokémon del catálogo con ese id, o null si no está.
+  Future<PokemonRow?> readPokemon(int id) => _db.catalogDao.getPokemon(id);
+
+  /// `content_hash` recalculado desde las filas locales de [id] (OF-19), o null
+  /// si el Pokémon no está en el catálogo. No usa el hash guardado, así que
+  /// detecta también filas alteradas en el dispositivo.
+  Future<String?> localContentHash(int id) async {
+    final pokemon = await _db.catalogDao.getPokemon(id);
+    if (pokemon == null) return null;
+    final types = await _db.catalogDao.typesOf(id);
+    final stats = await _db.catalogDao.statsOf(id);
+    final abilities = await _db.catalogDao.abilitiesOf(id);
+    return computeContentHash(
+      name: pokemon.name,
+      height: pokemon.height,
+      weight: pokemon.weight,
+      types: [for (final t in types) (slot: t.slot, typeId: t.typeId)],
+      abilities: [
+        for (final a in abilities)
+          (slot: a.slot, abilityId: a.abilityId, isHidden: a.isHidden),
+      ],
+      stats: [for (final s in stats) (statId: s.statId, baseStat: s.baseStat)],
+    );
+  }
+
+  /// Guarda el detalle completo de un Pokémon en **una sola transacción**
+  /// (PS-07, todo o nada): si algo falla no queda nada del detalle. Reemplaza
+  /// tipos, stats, habilidades, movimientos, variantes y cadena evolutiva, y
+  /// completa los textos en español de la especie y de las habilidades.
+  Future<void> saveDetail(PokemonDetailRecord record) {
+    return _db.transaction(() async {
+      final dao = _db.catalogDao;
+      await dao.upsertSpecies(record.species);
+      await dao.replaceSpeciesEggGroups(
+        record.species.id.value,
+        record.eggGroupIds,
+      );
+      await dao.upsertAbilities(record.abilityRows);
+      await dao.upsertPokemon(
+        record.pokemon,
+        types: record.types,
+        stats: record.stats,
+        abilities: record.abilities,
+      );
+      await dao.replacePokemonMoves(record.pokemon.id.value, record.moves);
+      await dao.replaceSpeciesForms(record.species.id.value, record.forms);
+      final chainId = record.evolutionChainId;
+      if (chainId != null) {
+        await dao.replaceEvolutionChain(chainId, record.evolutions);
+      }
+    });
+  }
 
   /// Guarda un lote de Pokémon y mueve el cursor de [resourceKey] a
   /// [nextOffset] en **una sola transacción** (PS-07): si algo falla no queda

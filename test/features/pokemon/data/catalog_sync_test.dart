@@ -460,4 +460,7 @@ class _FailingReference implements PokemonRemoteSource {
     required int offset,
     required int limit,
   }) => _inner.fetchPage(offset: offset, limit: limit);
+
+  @override
+  Future<Map<String, dynamic>> fetchDetail(int id) => _inner.fetchDetail(id);
 }
