@@ -26,6 +26,9 @@ Future<Map<String, int>> catalogCounts(AppDatabase db) async => {
     'pokemon_type',
     'pokemon_stat',
     'pokemon_ability',
+    'pokemon_move',
+    'evolution',
+    'pokemon_form',
   ])
     table: await rowCount(db, table),
 };
