@@ -5,6 +5,7 @@ import 'package:regi_dex/core/sync/backoff_policy.dart';
 import 'package:regi_dex/core/sync/sync_coordinator.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_local_source.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_sync.dart';
+import 'package:regi_dex/features/pokemon/data/detail_sync.dart';
 import 'package:regi_dex/features/pokemon/data/pokemon_repository_impl.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
@@ -29,6 +30,11 @@ void main() {
     catalog: db.catalogDao,
     coordinator: using,
     sync: CatalogSync(
+      remote: source,
+      local: CatalogLocalSource(db),
+      coordinator: using,
+    ),
+    detail: DetailSync(
       remote: source,
       local: CatalogLocalSource(db),
       coordinator: using,
@@ -155,6 +161,34 @@ void main() {
 
       expect(remote.pageOffsets, [200, 400]);
       expect(await current(), hasLength(450));
+    });
+  });
+
+  group('syncDetail', () {
+    test('descarga el detalle una sola vez mientras está vigente', () async {
+      await time.run(repository.refresh);
+
+      await time.run(() => repository.syncDetail(25));
+      await time.run(() => repository.syncDetail(25));
+
+      expect(remote.detailIds, [25]);
+      final pokemon = (await db.catalogDao.getPokemon(25))!;
+      expect(pokemon.detailSyncedAt, time.now);
+      final entry = await db.syncMetadataDao.getEntry('detail:25');
+      expect(entry!.status, SyncMetadataStatus.completed);
+    });
+
+    test('si falla propaga el Failure y no toca el catálogo', () async {
+      await time.run(repository.refresh);
+      remote.failDetail = true;
+
+      await expectLater(
+        time.run(() => repository.syncDetail(25)),
+        throwsA(isA<NetworkFailure>()),
+      );
+
+      expect(await current(), hasLength(450));
+      expect((await db.catalogDao.getPokemon(25))!.detailSyncedAt, isNull);
     });
   });
 }

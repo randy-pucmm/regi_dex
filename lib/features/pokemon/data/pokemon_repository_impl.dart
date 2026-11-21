@@ -4,6 +4,7 @@ import '../domain/pokemon.dart';
 import '../domain/pokemon_query.dart';
 import '../domain/pokemon_repository.dart';
 import 'catalog_sync.dart';
+import 'detail_sync.dart';
 import 'pokemon_entity_mapper.dart';
 
 /// Repositorio del catálogo sobre Drift (fuente de verdad) y la
@@ -13,11 +14,13 @@ class PokemonRepositoryImpl implements PokemonRepository {
     required this._catalog,
     required this._coordinator,
     required this._sync,
+    required this._detail,
   });
 
   final CatalogDao _catalog;
   final SyncCoordinator _coordinator;
   final CatalogSync _sync;
+  final DetailSync _detail;
 
   /// Pokémon de la base local como entidades de dominio. Por ahora [query]
   /// está vacía y devuelve todo el catálogo por número nacional. Solo emite
@@ -34,4 +37,10 @@ class PokemonRepositoryImpl implements PokemonRepository {
   @override
   Future<void> refresh() =>
       _coordinator.run<void>(CatalogSync.resourceKey, _sync.execute);
+
+  /// Descarga el detalle de [pokemonId] solo si falta o venció (3 días).
+  @override
+  Future<void> syncDetail(int pokemonId) async {
+    await _detail.sync(pokemonId);
+  }
 }
