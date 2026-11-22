@@ -95,3 +95,36 @@ Future<void> upsertBulbasaur(
     ],
   );
 }
+
+/// Inserta la especie y el Pokémon [id] con [name] y un tipo (requiere
+/// [seedReference]). Sirve para armar catálogos pequeños en las pruebas.
+Future<void> upsertSimplePokemon(
+  AppDatabase db,
+  int id,
+  String name, {
+  int typeId = 12,
+}) async {
+  await db.catalogDao.upsertSpecies(
+    SpeciesCompanion.insert(id: Value(id), name: name, generationId: 1),
+  );
+  await db.catalogDao.upsertPokemon(
+    PokemonsCompanion.insert(
+      id: Value(id),
+      speciesId: id,
+      name: name,
+      lightSyncedAt: DateTime(2026, 11, 3, 10),
+    ),
+    types: [(slot: 1, typeId: typeId)],
+    stats: const [],
+    abilities: const [],
+  );
+}
+
+/// Catálogo de búsqueda: Pikachu, Raichu, Porygon2, Regirock y Regice.
+Future<void> seedSearchCatalog(AppDatabase db) async {
+  await upsertSimplePokemon(db, 25, 'pikachu');
+  await upsertSimplePokemon(db, 26, 'raichu');
+  await upsertSimplePokemon(db, 233, 'porygon2');
+  await upsertSimplePokemon(db, 377, 'regirock');
+  await upsertSimplePokemon(db, 378, 'regice');
+}

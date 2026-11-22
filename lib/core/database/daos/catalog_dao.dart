@@ -8,6 +8,26 @@ part 'catalog_dao.g.dart';
 /// Un Pokémon con sus tipos ya resueltos, por orden de slot.
 typedef PokemonWithTypes = ({PokemonRow pokemon, List<TypeRow> types});
 
+/// Qué Pokémon del catálogo se piden. Sin campos devuelve todos.
+class CatalogCriteria {
+  const CatalogCriteria({this.number, this.namePart});
+
+  /// Número nacional exacto.
+  final int? number;
+
+  /// Trozo del nombre, sin distinguir mayúsculas.
+  final String? namePart;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CatalogCriteria &&
+      other.number == number &&
+      other.namePart == namePart;
+
+  @override
+  int get hashCode => Object.hash(number, namePart);
+}
+
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
 @DriftAccessor(
   tables: [
@@ -29,23 +49,32 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   Stream<List<PokemonRow>> watchAllPokemon() =>
       (select(pokemons)..orderBy([(p) => OrderingTerm.asc(p.id)])).watch();
 
-  /// Todos los Pokémon por id, cada uno con sus tipos por slot (uno o dos; la
-  /// lista queda vacía si aún no tiene). Es una sola consulta con join: vuelve
-  /// a emitir cuando cambia el catálogo o la tabla de tipos, y como cada lote
-  /// de la sincronización es una transacción, emite una vez por lote.
-  Stream<List<PokemonWithTypes>> watchPokemonWithTypes() {
+  /// Los Pokémon que cumplen [criteria] (todos si está vacía) por id, cada uno
+  /// con sus tipos por slot (uno o dos; la lista queda vacía si aún no tiene).
+  /// Es una sola consulta con join: vuelve a emitir cuando cambia el catálogo o
+  /// la tabla de tipos, y como cada lote de la sincronización es una
+  /// transacción, emite una vez por lote. El nombre se busca con `instr` sobre
+  /// el nombre en minúsculas: «contiene», sin comodines que escapar.
+  Stream<List<PokemonWithTypes>> watchPokemonWithTypes([
+    CatalogCriteria criteria = const CatalogCriteria(),
+  ]) {
     final typeTable = attachedDatabase.types;
     final query =
         select(pokemons).join([
-          leftOuterJoin(
-            pokemonTypes,
-            pokemonTypes.pokemonId.equalsExp(pokemons.id),
-          ),
-          leftOuterJoin(typeTable, typeTable.id.equalsExp(pokemonTypes.typeId)),
-        ])..orderBy([
-          OrderingTerm.asc(pokemons.id),
-          OrderingTerm.asc(pokemonTypes.slot),
-        ]);
+            leftOuterJoin(
+              pokemonTypes,
+              pokemonTypes.pokemonId.equalsExp(pokemons.id),
+            ),
+            leftOuterJoin(
+              typeTable,
+              typeTable.id.equalsExp(pokemonTypes.typeId),
+            ),
+          ])
+          ..where(_matches(criteria))
+          ..orderBy([
+            OrderingTerm.asc(pokemons.id),
+            OrderingTerm.asc(pokemonTypes.slot),
+          ]);
 
     return query.watch().map((rows) {
       final result = <PokemonWithTypes>[];
@@ -60,6 +89,23 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       }
       return result;
     });
+  }
+
+  /// Condición de [criteria] sobre `pokemon`; verdadera si no pide nada.
+  Expression<bool> _matches(CatalogCriteria criteria) {
+    Expression<bool> where = const Constant(true);
+    final number = criteria.number;
+    if (number != null) where = where & pokemons.id.equals(number);
+    final namePart = criteria.namePart;
+    if (namePart != null) {
+      where =
+          where &
+          FunctionCallExpression<int>('instr', [
+            pokemons.name.lower(),
+            Variable<String>(namePart),
+          ]).isBiggerThanValue(0);
+    }
+    return where;
   }
 
   /// Cantidad de Pokémon del catálogo, como flujo.

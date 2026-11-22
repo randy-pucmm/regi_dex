@@ -116,6 +116,50 @@ void main() {
     );
   });
 
+  group('watchPokemon con búsqueda (PA-17)', () {
+    Future<List<String>> names(String search) async => [
+      for (final p
+          in await repository.watchPokemon(PokemonQuery(search: search)).first)
+        p.name,
+    ];
+
+    setUp(() async {
+      await seedReference(db);
+      await seedSearchCatalog(db);
+    });
+
+    test('«377» devuelve Regirock', () async {
+      expect(await names('377'), ['regirock']);
+    });
+
+    test('«#0378» devuelve Regice', () async {
+      expect(await names('#0378'), ['regice']);
+    });
+
+    test('«25», «#025» y «pika» devuelven Pikachu', () async {
+      expect(await names('25'), ['pikachu']);
+      expect(await names('#025'), ['pikachu']);
+      expect(await names('pika'), ['pikachu']);
+    });
+
+    test('«reg» devuelve los dos Regis por número', () async {
+      expect(await names('reg'), ['regirock', 'regice']);
+    });
+
+    test(
+      'una búsqueda sin coincidencias queda vacía, sin llamar a la red',
+      () async {
+        expect(await names('mewtwo'), isEmpty);
+        expect(remote.pageOffsets, isEmpty);
+        expect(remote.referenceCalls, 0);
+      },
+    );
+
+    test('la búsqueda en blanco devuelve todo', () async {
+      expect(await names('   '), hasLength(5));
+    });
+  });
+
   group('refresh', () {
     test('sincroniza el catálogo y deja la sync completada', () async {
       await time.run(repository.refresh);
