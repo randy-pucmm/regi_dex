@@ -1,3 +1,4 @@
+import 'package:regi_dex/features/pokemon/domain/catalog_filters.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_repository.dart';
@@ -25,6 +26,29 @@ class FakePokemonRepository implements PokemonRepository {
     refreshes++;
     final error = refreshError;
     if (error != null) throw error;
+  }
+
+  /// Opciones de filtro y disponibilidad que emite el repositorio falso.
+  FilterOptions filterOptions = FilterOptions.empty;
+  var availability = const CatalogAvailability(available: 0);
+
+  /// Lo que devuelve `loadQuery` y lo último que se guardó con `saveQuery`.
+  var storedQuery = const PokemonQuery();
+  final savedQueries = <PokemonQuery>[];
+
+  @override
+  Stream<FilterOptions> watchFilterOptions() => Stream.value(filterOptions);
+
+  @override
+  Stream<CatalogAvailability> watchAvailability() => Stream.value(availability);
+
+  @override
+  Future<PokemonQuery> loadQuery() async => storedQuery;
+
+  @override
+  Future<void> saveQuery(PokemonQuery query) async {
+    savedQueries.add(query);
+    storedQuery = query;
   }
 
   /// Búsquedas remotas pedidas, en orden.

@@ -5,6 +5,14 @@ import '../tables/reference_tables.dart';
 
 part 'reference_dao.g.dart';
 
+/// Los datos de referencia que alimentan los filtros del catálogo.
+typedef FilterReference = ({
+  List<TypeRow> types,
+  List<GenerationRow> generations,
+  List<EggGroupRow> eggGroups,
+  List<AbilityRow> abilities,
+});
+
 /// Acceso a los datos de referencia: tipos, generaciones, grupos huevo,
 /// habilidades, movimientos, version groups y eficacias.
 @DriftAccessor(
@@ -43,6 +51,30 @@ class ReferenceDao extends DatabaseAccessor<AppDatabase>
         b.insertAllOnConflictUpdate(this.versionGroups, versionGroups);
         b.insertAllOnConflictUpdate(this.typeEfficacies, typeEfficacies);
       });
+    });
+  }
+
+  /// Los valores de los cuatro filtros del catálogo, cada uno por id. Emite al
+  /// suscribirse y vuelve a emitir cuando cambia cualquiera de las cuatro tablas.
+  Stream<FilterReference> watchFilterReference() {
+    return customSelect(
+      'SELECT 1',
+      readsFrom: {types, generations, eggGroups, abilities},
+    ).watch().asyncMap((_) async {
+      return (
+        types: await (select(
+          types,
+        )..orderBy([(t) => OrderingTerm.asc(t.id)])).get(),
+        generations: await (select(
+          generations,
+        )..orderBy([(g) => OrderingTerm.asc(g.id)])).get(),
+        eggGroups: await (select(
+          eggGroups,
+        )..orderBy([(g) => OrderingTerm.asc(g.id)])).get(),
+        abilities: await (select(
+          abilities,
+        )..orderBy([(a) => OrderingTerm.asc(a.id)])).get(),
+      );
     });
   }
 

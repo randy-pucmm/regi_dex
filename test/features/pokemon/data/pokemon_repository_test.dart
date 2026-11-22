@@ -1,5 +1,7 @@
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/core/database/app_database.dart';
+import 'package:regi_dex/core/database/preference_keys.dart';
 import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/sync/backoff_policy.dart';
 import 'package:regi_dex/core/sync/sync_coordinator.dart';
@@ -9,6 +11,7 @@ import 'package:regi_dex/features/pokemon/data/detail_sync.dart';
 import 'package:regi_dex/features/pokemon/data/pokemon_mapper.dart';
 import 'package:regi_dex/features/pokemon/data/pokemon_repository_impl.dart';
 import 'package:regi_dex/features/pokemon/data/remote_search.dart';
+import 'package:regi_dex/features/pokemon/domain/catalog_filters.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 
@@ -43,6 +46,8 @@ void main() {
       coordinator: using,
     ),
     search: RemoteSearch(remote: source, local: CatalogLocalSource(db)),
+    reference: db.referenceDao,
+    preferences: db.preferenceDao,
   );
 
   setUp(() {
@@ -209,6 +214,188 @@ void main() {
           .first;
 
       expect(result.first.types.map((t) => t.name), ['rock', 'ground']);
+    });
+  });
+
+  group('watchFilterOptions', () {
+    test('sin referencia descargada está vacío', () async {
+      expect(await repository.watchFilterOptions().first, FilterOptions.empty);
+    });
+
+    test('ofrece cada categoría con textos legibles', () async {
+      await db.referenceDao.upsertReferenceData(
+        generations: [
+          GenerationsCompanion.insert(
+            id: const Value(4),
+            name: 'generation-iv',
+            region: const Value('sinnoh'),
+          ),
+          GenerationsCompanion.insert(id: const Value(1), name: 'generation-i'),
+        ],
+        types: [
+          TypesCompanion.insert(
+            id: const Value(6),
+            name: 'rock',
+            nameEs: const Value('Roca'),
+          ),
+          TypesCompanion.insert(id: const Value(3), name: 'flying'),
+        ],
+        eggGroups: [
+          EggGroupsCompanion.insert(id: const Value(15), name: 'no-eggs'),
+        ],
+        abilities: [
+          AbilitiesCompanion.insert(id: const Value(69), name: 'rock-head'),
+          AbilitiesCompanion.insert(
+            id: const Value(9),
+            name: 'static',
+            nameEs: const Value('Electricidad'),
+          ),
+          AbilitiesCompanion.insert(id: const Value(1), name: 'stench'),
+        ],
+      );
+
+      final options = await repository.watchFilterOptions().first;
+
+      expect(options.types, const [
+        FilterOption(id: 3, key: 'flying', label: 'Flying'),
+        FilterOption(id: 6, key: 'rock', label: 'Roca'),
+      ]);
+      expect(options.generations.map((g) => g.label), [
+        'Gen. I',
+        'Gen. IV · Sinnoh',
+      ]);
+      expect(options.eggGroups.single.label, 'No eggs');
+      expect(options.abilities.map((a) => a.label), [
+        'Electricidad',
+        'Rock head',
+        'Stench',
+      ]);
+    });
+
+    test('vuelve a emitir cuando llega la referencia', () async {
+      final counts = <int>[];
+      final sub = repository
+          .watchFilterOptions()
+          .map((o) => o.types.length)
+          .listen(counts.add);
+      await pumpEventQueue();
+
+      for (final id in [3, 6]) {
+        await db.referenceDao.upsertReferenceData(
+          types: [TypesCompanion.insert(id: Value(id), name: 'tipo-$id')],
+        );
+        await pumpEventQueue();
+      }
+
+      expect(counts, [0, 1, 2]);
+      await sub.cancel();
+    });
+  });
+
+  group('watchAvailability (RF-FIL-05)', () {
+    test('sin total conocido no hay aviso', () async {
+      final value = await repository.watchAvailability().first;
+
+      expect(value, const CatalogAvailability(available: 0));
+      expect(value.isPartial, isFalse);
+    });
+
+    test('cuenta lo guardado frente al total', () async {
+      await db.preferenceDao.setValue(PreferenceKeys.catalogTotal, '1025');
+      await seedReference(db);
+      await seedSearchCatalog(db);
+
+      final value = await repository.watchAvailability().first;
+
+      expect(value, const CatalogAvailability(available: 5, total: 1025));
+      expect(value.isPartial, isTrue);
+    });
+
+    test('con el catálogo completo no es parcial', () async {
+      await db.preferenceDao.setValue(PreferenceKeys.catalogTotal, '5');
+      await seedReference(db);
+      await seedSearchCatalog(db);
+
+      expect((await repository.watchAvailability().first).isPartial, isFalse);
+    });
+
+    test('sube al llegar Pokémon y al cambiar el total', () async {
+      await db.preferenceDao.setValue(PreferenceKeys.catalogTotal, '1025');
+      final emissions = expectLater(
+        repository.watchAvailability().map((a) => (a.available, a.total)),
+        emitsInOrder([(0, 1025), (1, 1025), (1, 1026)]),
+      );
+
+      await seedReference(db);
+      await upsertSimplePokemon(db, 25, 'pikachu');
+      await db.preferenceDao.setValue(PreferenceKeys.catalogTotal, '1026');
+      await emissions;
+    });
+
+    test('un total dañado se ignora', () async {
+      await db.preferenceDao.setValue(PreferenceKeys.catalogTotal, 'mucho');
+
+      expect((await repository.watchAvailability().first).total, isNull);
+    });
+  });
+
+  group('loadQuery y saveQuery (RF-FIL-04)', () {
+    const saved = PokemonQuery(
+      search: 'reg',
+      types: {6},
+      eggGroups: {3},
+      sort: PokemonSort.baseTotal,
+      descending: true,
+    );
+
+    test('sin nada guardado devuelve la consulta por defecto', () async {
+      expect(await repository.loadQuery(), const PokemonQuery());
+    });
+
+    test('lo guardado se recupera igual', () async {
+      await repository.saveQuery(saved);
+
+      expect(await repository.loadQuery(), saved);
+    });
+
+    test('guarda en user_preference como JSON', () async {
+      await repository.saveQuery(saved);
+
+      final raw = await db.preferenceDao.getValue(PreferenceKeys.catalogQuery);
+      expect(PokemonQuery.decode(raw), saved);
+    });
+
+    test('guardar de nuevo reemplaza lo anterior', () async {
+      await repository.saveQuery(saved);
+      await repository.saveQuery(const PokemonQuery(types: {13}));
+
+      expect(await repository.loadQuery(), const PokemonQuery(types: {13}));
+    });
+
+    test('guardar la consulta por defecto borra la preferencia', () async {
+      await repository.saveQuery(saved);
+
+      await repository.saveQuery(const PokemonQuery());
+
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogQuery),
+        isNull,
+      );
+      expect(await repository.loadQuery(), const PokemonQuery());
+    });
+
+    test('una preferencia dañada vuelve a lo de por defecto', () async {
+      await db.preferenceDao.setValue(PreferenceKeys.catalogQuery, '{rota');
+
+      expect(await repository.loadQuery(), const PokemonQuery());
+    });
+
+    test('sobrevive a una nueva sesión sobre la misma base', () async {
+      await repository.saveQuery(saved);
+
+      final next = buildRepository(remote, coordinator);
+
+      expect(await next.loadQuery(), saved);
     });
   });
 

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:regi_dex/features/pokemon/domain/catalog_filters.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_repository.dart';
@@ -22,6 +23,20 @@ class _RecordingRepository implements PokemonRepository {
 
   final detailRequests = <int>[];
   final remoteSearches = <String>[];
+
+  @override
+  Stream<FilterOptions> watchFilterOptions() =>
+      Stream.value(FilterOptions.empty);
+
+  @override
+  Stream<CatalogAvailability> watchAvailability() =>
+      Stream.value(const CatalogAvailability(available: 0));
+
+  @override
+  Future<PokemonQuery> loadQuery() async => const PokemonQuery();
+
+  @override
+  Future<void> saveQuery(PokemonQuery query) async {}
 
   @override
   Future<int> searchRemote(String search) async {

@@ -153,6 +153,8 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>(
     sync: ref.watch(catalogSyncProvider),
     detail: ref.watch(detailSyncProvider),
     search: ref.watch(remoteSearchProvider),
+    reference: ref.watch(appDatabaseProvider).referenceDao,
+    preferences: ref.watch(appDatabaseProvider).preferenceDao,
   ),
 );
 

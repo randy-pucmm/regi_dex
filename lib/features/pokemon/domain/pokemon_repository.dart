@@ -1,3 +1,4 @@
+import 'catalog_filters.dart';
 import 'pokemon.dart';
 import 'pokemon_query.dart';
 
@@ -12,6 +13,22 @@ abstract interface class PokemonRepository {
   /// Pide una sincronización del catálogo y espera a que termine. Si ya hay
   /// una en curso se une a ella. Si falla, lanza el `Failure` correspondiente.
   Future<void> refresh();
+
+  /// Los valores que ofrece cada filtro (tipos, generaciones, grupos huevo y
+  /// habilidades), desde la referencia local; vacío hasta que se descarga.
+  Stream<FilterOptions> watchFilterOptions();
+
+  /// Cuántos Pokémon hay en el dispositivo frente al total de la Pokédex, para
+  /// avisar si el catálogo local está incompleto (RF-FIL-05).
+  Stream<CatalogAvailability> watchAvailability();
+
+  /// La búsqueda, los filtros y el orden de la última sesión (RF-FIL-04), o la
+  /// consulta por defecto si no hay nada guardado o está dañado.
+  Future<PokemonQuery> loadQuery();
+
+  /// Guarda [query] para la próxima sesión; la consulta por defecto borra lo
+  /// guardado.
+  Future<void> saveQuery(PokemonQuery query);
 
   /// Busca [search] (nombre o número nacional) en PokéAPI y guarda lo que
   /// encuentre en la base; `watchPokemon` lo emite después. Devuelve cuántos
