@@ -7,6 +7,7 @@ import 'package:regi_dex/features/pokemon/data/catalog_local_source.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_sync.dart';
 import 'package:regi_dex/features/pokemon/data/detail_sync.dart';
 import 'package:regi_dex/features/pokemon/data/pokemon_repository_impl.dart';
+import 'package:regi_dex/features/pokemon/data/remote_search.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 
@@ -39,6 +40,7 @@ void main() {
       local: CatalogLocalSource(db),
       coordinator: using,
     ),
+    search: RemoteSearch(remote: source, local: CatalogLocalSource(db)),
   );
 
   setUp(() {
@@ -157,6 +159,37 @@ void main() {
 
     test('la búsqueda en blanco devuelve todo', () async {
       expect(await names('   '), hasLength(5));
+    });
+  });
+
+  group('searchRemote', () {
+    test('guarda lo encontrado y watchPokemon lo emite', () async {
+      remote.searchResultIds = [377];
+
+      final saved = await repository.searchRemote('#0377');
+
+      expect(saved, 1);
+      expect(remote.searches, ['numero:377']);
+      final found = await repository
+          .watchPokemon(const PokemonQuery(search: '377'))
+          .first;
+      expect(found.map((p) => p.id), [377]);
+    });
+
+    test('una búsqueda en blanco no llama a la red', () async {
+      expect(await repository.searchRemote('  '), 0);
+      expect(remote.searches, isEmpty);
+    });
+
+    test('si falla propaga el Failure y la base sigue vacía', () async {
+      remote.failSearch = true;
+
+      await expectLater(
+        repository.searchRemote('pika'),
+        throwsA(isA<NetworkFailure>()),
+      );
+
+      expect(await current(), isEmpty);
     });
   });
 
