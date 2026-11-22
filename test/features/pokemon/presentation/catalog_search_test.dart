@@ -250,30 +250,22 @@ void main() {
       expect(() => query().types.add(1), throwsUnsupportedError);
     });
 
-    test(
-      'sortBy cambia el campo y, al repetirlo, invierte el sentido',
-      () async {
-        await start();
-
-        controller().sortBy(PokemonSort.name);
-        expect(query().sort, PokemonSort.name);
-        expect(query().descending, isFalse);
-
-        controller().sortBy(PokemonSort.name);
-        expect(query().descending, isTrue);
-
-        controller().sortBy(PokemonSort.baseTotal);
-        expect(query().sort, PokemonSort.baseTotal);
-        expect(query().descending, isFalse);
-      },
-    );
-
-    test('toggleDirection invierte el sentido', () async {
+    test('setSort cambia el campo y conserva el sentido', () async {
       await start();
 
-      controller().toggleDirection();
+      controller().setDescending(true);
+      controller().setSort(PokemonSort.name);
+
+      expect(query().sort, PokemonSort.name);
       expect(query().descending, isTrue);
-      controller().toggleDirection();
+    });
+
+    test('setDescending fija el sentido del orden', () async {
+      await start();
+
+      controller().setDescending(true);
+      expect(query().descending, isTrue);
+      controller().setDescending(false);
       expect(query().descending, isFalse);
     });
 
@@ -302,7 +294,7 @@ void main() {
       await start();
 
       controller().toggle(FilterCategory.types, 6);
-      controller().sortBy(PokemonSort.name);
+      controller().setSort(PokemonSort.name);
       controller().clear();
       await pumpEventQueue();
 

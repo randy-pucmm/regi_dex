@@ -66,18 +66,12 @@ class CatalogSearch extends Notifier<PokemonQuery> {
     });
   }
 
-  /// Ordena por [sort]; elegir el mismo campo otra vez invierte el sentido.
-  void sortBy(PokemonSort sort) {
-    _emit(
-      sort == state.sort
-          ? state.copyWith(descending: !state.descending)
-          : state.copyWith(sort: sort, descending: false),
-    );
-  }
+  /// Ordena por [sort] conservando el sentido actual.
+  void setSort(PokemonSort sort) => _emit(state.copyWith(sort: sort));
 
-  /// Cambia el sentido del orden actual.
-  void toggleDirection() =>
-      _emit(state.copyWith(descending: !state.descending));
+  /// Fija el sentido del orden: de mayor a menor con [descending].
+  void setDescending(bool descending) =>
+      _emit(state.copyWith(descending: descending));
 
   /// Quita todos los filtros de categoría; conserva la búsqueda y el orden.
   void clearFilters() => _emit(state.withoutFilters());

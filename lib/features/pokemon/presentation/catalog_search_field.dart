@@ -44,41 +44,35 @@ class _CatalogSearchFieldState extends ConsumerState<CatalogSearchField> {
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(color: regi.frame, width: 1.5),
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: TextField(
-          controller: _controller,
-          onChanged: ref.read(catalogQueryProvider.notifier).setText,
-          textInputAction: TextInputAction.search,
-          autocorrect: false,
-          enableSuggestions: false,
-          style: TextStyle(color: regi.onScreen),
-          cursorColor: regi.onScreen,
-          decoration: InputDecoration(
-            labelText: 'Buscar por nombre o número',
-            hintText: 'pika, 25 o #025',
-            labelStyle: TextStyle(color: regi.onScreen),
-            hintStyle: TextStyle(color: regi.onScreen.withValues(alpha: 0.7)),
-            prefixIcon: Icon(Icons.search, color: regi.onScreen),
-            suffixIcon: ListenableBuilder(
-              listenable: _controller,
-              builder: (context, _) => _controller.text.isEmpty
-                  ? const SizedBox.shrink()
-                  : IconButton(
-                      tooltip: 'Borrar búsqueda',
-                      icon: Icon(Icons.close, color: regi.onScreen),
-                      onPressed: _clear,
-                    ),
-            ),
-            enabledBorder: border,
-            focusedBorder: border.copyWith(
-              borderSide: BorderSide(color: regi.accent, width: 2.5),
-            ),
-            border: border,
-          ),
+    return TextField(
+      controller: _controller,
+      onChanged: ref.read(catalogQueryProvider.notifier).setText,
+      textInputAction: TextInputAction.search,
+      autocorrect: false,
+      enableSuggestions: false,
+      style: TextStyle(color: regi.onScreen),
+      cursorColor: regi.onScreen,
+      decoration: InputDecoration(
+        labelText: 'Buscar por nombre o número',
+        hintText: 'pika, 25 o #025',
+        labelStyle: TextStyle(color: regi.onScreen),
+        hintStyle: TextStyle(color: regi.onScreen.withValues(alpha: 0.7)),
+        prefixIcon: Icon(Icons.search, color: regi.onScreen),
+        suffixIcon: ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) => _controller.text.isEmpty
+              ? const SizedBox.shrink()
+              : IconButton(
+                  tooltip: 'Borrar búsqueda',
+                  icon: Icon(Icons.close, color: regi.onScreen),
+                  onPressed: _clear,
+                ),
         ),
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: BorderSide(color: regi.accent, width: 2.5),
+        ),
+        border: border,
       ),
     );
   }
