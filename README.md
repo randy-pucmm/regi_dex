@@ -32,7 +32,7 @@ Dónde está cada entregable del avance y cómo se comprueba.
 | # | Entregable | Dónde está | Cómo se comprueba |
 |---|---|---|---|
 | 1 | Estructura por funcionalidades con capas | `lib/features/<feature>/{presentation, domain, data}`, más `lib/core/` y `lib/ui/` (§6) | `test/architecture/layer_rules_test.dart` impone las reglas de dependencia entre capas |
-| 2 | Modelo de datos local | Drift v1 con 17 tablas: referencia, catálogo, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquema en `drift_schemas/drift_schema_v1.json`) | `test/core/database/` |
+| 2 | Modelo de datos local | Drift v2 con 20 tablas: referencia, catálogo y detalle, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquemas en `drift_schemas/`) | `test/core/database/`, incluida la migración v1 a v2 |
 | 3 | GraphQL con paginación y sin duplicados | `CatalogSync`: lotes de 200 con upsert por clave primaria (`lib/features/pokemon/data/catalog_sync.dart`) | `catalog_sync_test.dart`: tres sincronizaciones seguidas dejan los mismos conteos (PA-13) e interrumpir y reanudar no pierde ni repite filas (PA-09). Corrida real contra PokéAPI el 7 de noviembre: 1025 Pokémon, y la segunda pasada con los mismos conteos |
 | 4 | Fuente de lectura local | `PokemonRepository` (contrato en `domain`) sobre Drift; la pantalla solo observa `catalogStateProvider` | `layer_rules_test.dart`: `presentation` no importa GraphQL, Drift ni DTOs; `pokemon_repository_test.dart` |
 | 5 | Interfaz sin bloqueos | `main()` solo hace `runApp`; la sync arranca sin esperarla (`catalogAutoSyncProvider`) y el mapeo de cada lote corre en un isolate | `catalog_auto_sync_test.dart` y `pokemon_mapper_test.dart` (paso por isolate) |
@@ -154,7 +154,7 @@ lib/
 ├── ui/                        # sistema de diseño Regi: tokens, temas, carcasa Pokédex, LED, chips y barras
 └── l10n/                      # app_es.arb · app_en.arb (planificado)
 test/                          # espejo de lib/, más test/architecture con las reglas de capas
-drift_schemas/                 # volcado del esquema de Drift v1
+drift_schemas/                 # volcados del esquema de Drift (v1 y v2)
 assets/fonts/                  # Chakra Petch y Figtree (licencia OFL)
 ```
 
@@ -206,10 +206,20 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 
 Si algo falla se deshace solo el lote en curso y el siguiente intento reanuda desde el cursor. Una pasada nueva reescribe por clave primaria, así que repetir la sincronización no duplica filas. La interfaz recibe los lotes a medida que se confirman, porque observa la base de datos.
 
-**Repositorio y arranque.** La interfaz no ve GraphQL ni Drift: consume `PokemonRepository` (contrato en `domain`) mediante los casos de uso `WatchPokemon` y `RefreshCatalog`.
+**Sincronización del detalle.** `DetailSync` trae el detalle de un Pokémon al abrirlo (`SyncPokemonDetail`) con la clave `detail:{id}`:
+
+1. Si `detail_synced_at` tiene menos de 3 días no hace nada. Si falta o venció, pide `GetPokemonDetail` **una sola vez**: identidad, estadísticas, habilidades, movimientos, formas, sprites shiny y la cadena evolutiva. La consola muestra la consulta con su id, por ejemplo `[GraphQL] GetPokemonDetail {id: 25, langs: [es, en]} ok`.
+2. Valida y convierte la respuesta en un isolate, y recalcula el `content_hash` local para compararlo con el remoto; si difieren, **el remoto gana**.
+3. Guarda todo en **una sola transacción** (todo o nada): `pokemon`, `pokemon_type`, `pokemon_stat`, `pokemon_ability`, `pokemon_move`, `pokemon_form`, `evolution`, y los textos en español de la especie y las habilidades. Si algo falla no queda nada del detalle y se conserva el anterior.
+4. Dos aperturas simultáneas del mismo Pokémon comparten la misma llamada (*single-flight*).
+
+El esquema v2 agrega `pokemon_move`, `evolution` y `pokemon_form`, además de las columnas shiny de `pokemon`. La pantalla de detalle solo debe leer de la base.
+
+**Repositorio y arranque.** La interfaz no ve GraphQL ni Drift: consume `PokemonRepository` (contrato en `domain`) mediante los casos de uso `WatchPokemon`, `RefreshCatalog` y `SyncPokemonDetail`.
 
 - `watchPokemon(query)` emite entidades `Pokemon` con sus tipos desde la base local, una vez por lote confirmado y solo cuando la lista cambia. Por ahora la consulta vacía devuelve todo por número nacional; la búsqueda y los filtros la ampliarán.
 - `refresh()` pide la sincronización al `SyncCoordinator`, que une las solicitudes simultáneas en una sola.
+- `syncDetail(id)` descarga el detalle solo si falta o venció (3 días).
 - Al abrir la app y cada vez que el servicio pasa a online, `catalogAutoSyncProvider` sincroniza el catálogo si hace falta: nunca se completó, quedó a medias o fallida, o tiene más de 7 días. Se lanza sin esperar, así que no bloquea el arranque. Con el catálogo vigente no hace ninguna llamada.
 
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)

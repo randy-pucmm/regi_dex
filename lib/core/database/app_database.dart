@@ -31,6 +31,9 @@ part 'app_database.g.dart';
     PokemonTypes,
     PokemonStats,
     PokemonAbilities,
+    PokemonMoves,
+    Evolutions,
+    PokemonForms,
     Favorites,
     UserPreferences,
     SyncMetadataEntries,
@@ -52,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'regidex'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +65,18 @@ class AppDatabase extends _$AppDatabase {
       await customStatement(
         'CREATE INDEX idx_pokemon_name_nocase ON pokemon (name COLLATE NOCASE)',
       );
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        // v2 (RD-24): detalle bajo demanda: movimientos, evolución, formas y shiny.
+        await m.addColumn(pokemons, pokemons.spriteShinyUrl);
+        await m.addColumn(pokemons, pokemons.artworkShinyUrl);
+        await m.createTable(pokemonMoves);
+        await m.createTable(evolutions);
+        await m.createTable(pokemonForms);
+        await m.createIndex(idxEvolutionChainId);
+        await m.createIndex(idxPokemonFormSpeciesId);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

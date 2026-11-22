@@ -12,4 +12,10 @@ abstract interface class PokemonRepository {
   /// Pide una sincronización del catálogo y espera a que termine. Si ya hay
   /// una en curso se une a ella. Si falla, lanza el `Failure` correspondiente.
   Future<void> refresh();
+
+  /// Trae y guarda el detalle de [pokemonId] (con su cadena evolutiva) en una
+  /// sola llamada si falta o venció a los 3 días; si está vigente no hace nada.
+  /// Si ya hay una descarga de ese Pokémon en curso se une a ella. Si falla,
+  /// lanza el `Failure` correspondiente y conserva lo local.
+  Future<void> syncDetail(int pokemonId);
 }

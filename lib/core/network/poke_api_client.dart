@@ -67,6 +67,10 @@ class PokeApiClient {
   }
 
   final Duration responseTimeout;
+
+  /// Largo máximo de las variables en la línea de consola.
+  static const _maxVariablesLength = 120;
+
   final OperationLoader _loader;
   final void Function(String message) _log;
   final _calls = StreamController<ApiCallEvent>.broadcast();
@@ -116,7 +120,7 @@ class PokeApiClient {
       httpStatus: httpStatus,
       failure: failure,
     );
-    _log(_describe(event));
+    _log(_describe(event, variables));
     if (!_calls.isClosed) _calls.add(event);
 
     if (failure != null) throw failure;
@@ -129,10 +133,17 @@ class PokeApiClient {
     _calls.close();
   }
 
-  String _describe(ApiCallEvent event) {
+  /// Línea de consola de una llamada: operación, variables (acortadas si son
+  /// largas), resultado, duración, intento y estado HTTP. Con ella se ve qué
+  /// consulta salió y con qué id (PA-02).
+  String _describe(ApiCallEvent event, Map<String, dynamic> variables) {
     final status = event.httpStatus == null ? '' : ', HTTP ${event.httpStatus}';
     final outcome = event.isSuccess ? 'ok' : 'falló (${event.failure})';
-    return '[GraphQL] ${event.operation.operationName} $outcome '
+    var shown = variables.isEmpty ? '' : ' $variables';
+    if (shown.length > _maxVariablesLength) {
+      shown = '${shown.substring(0, _maxVariablesLength)}…}';
+    }
+    return '[GraphQL] ${event.operation.operationName}$shown $outcome '
         'en ${event.duration.inMilliseconds} ms '
         '(intento ${event.attempt}$status)';
   }

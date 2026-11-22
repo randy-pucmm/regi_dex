@@ -17,6 +17,9 @@ typedef PokemonWithTypes = ({PokemonRow pokemon, List<TypeRow> types});
     PokemonTypes,
     PokemonStats,
     PokemonAbilities,
+    PokemonMoves,
+    Evolutions,
+    PokemonForms,
   ],
 )
 class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
@@ -93,6 +96,69 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
             ),
         ]),
       );
+    });
+  }
+
+  /// Tipos de [pokemonId] por slot.
+  Future<List<PokemonTypeRow>> typesOf(int pokemonId) =>
+      (select(pokemonTypes)
+            ..where((t) => t.pokemonId.equals(pokemonId))
+            ..orderBy([(t) => OrderingTerm.asc(t.slot)]))
+          .get();
+
+  /// Estadísticas base de [pokemonId] por id de stat.
+  Future<List<PokemonStatRow>> statsOf(int pokemonId) =>
+      (select(pokemonStats)
+            ..where((t) => t.pokemonId.equals(pokemonId))
+            ..orderBy([(t) => OrderingTerm.asc(t.statId)]))
+          .get();
+
+  /// Habilidades de [pokemonId] por slot.
+  Future<List<PokemonAbilityRow>> abilitiesOf(int pokemonId) =>
+      (select(pokemonAbilities)
+            ..where((t) => t.pokemonId.equals(pokemonId))
+            ..orderBy([(t) => OrderingTerm.asc(t.slot)]))
+          .get();
+
+  /// Inserta o actualiza habilidades por id; solo cambia las columnas con valor.
+  Future<void> upsertAbilities(List<AbilitiesCompanion> rows) => batch(
+    (b) => b.insertAllOnConflictUpdate(attachedDatabase.abilities, rows),
+  );
+
+  /// Reemplaza los movimientos de [pokemonId] por [rows].
+  Future<void> replacePokemonMoves(
+    int pokemonId,
+    List<PokemonMovesCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(
+        pokemonMoves,
+      )..where((t) => t.pokemonId.equals(pokemonId))).go();
+      await batch((b) => b.insertAll(pokemonMoves, rows));
+    });
+  }
+
+  /// Reemplaza las variantes de [speciesId] por [rows].
+  Future<void> replaceSpeciesForms(
+    int speciesId,
+    List<PokemonFormsCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(
+        pokemonForms,
+      )..where((t) => t.speciesId.equals(speciesId))).go();
+      await batch((b) => b.insertAll(pokemonForms, rows));
+    });
+  }
+
+  /// Reemplaza la cadena evolutiva [chainId] por [rows], en su orden.
+  Future<void> replaceEvolutionChain(
+    int chainId,
+    List<EvolutionsCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(evolutions)..where((t) => t.chainId.equals(chainId))).go();
+      await batch((b) => b.insertAll(evolutions, rows));
     });
   }
 

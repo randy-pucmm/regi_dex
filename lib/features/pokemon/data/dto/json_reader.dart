@@ -44,6 +44,13 @@ class JsonReader {
     _ => throw _invalid(key, 'un objeto'),
   };
 
+  /// Objeto anidado opcional: null si falta o vale null.
+  JsonReader? objectOrNull(String key) => switch (json[key]) {
+    null => null,
+    final Map<String, dynamic> value => JsonReader(value, '$context.$key'),
+    _ => throw _invalid(key, 'un objeto o null'),
+  };
+
   /// Lista obligatoria de objetos.
   List<JsonReader> objects(String key) => switch (json[key]) {
     final List<dynamic> values => [
@@ -61,10 +68,15 @@ class JsonReader {
 
   /// Nombre en [language] dentro de la lista [key] de `{name, language: {name}}`,
   /// o null si no hay traducción.
-  String? localizedName(String key, String language) {
+  String? localizedName(String key, String language) =>
+      localized(key, 'name', language);
+
+  /// Texto `valueKey` en [language] dentro de la lista [key] de
+  /// `{valueKey, language: {name}}`, o null si no hay traducción.
+  String? localized(String key, String valueKey, String language) {
     for (final item in objects(key)) {
       if (item.object('language').string('name') == language) {
-        return item.string('name');
+        return item.stringOrNull(valueKey);
       }
     }
     return null;
