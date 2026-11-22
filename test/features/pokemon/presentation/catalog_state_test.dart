@@ -153,4 +153,61 @@ void main() {
       );
     });
   });
+
+  group('con filtros', () {
+    const filtered = PokemonQuery(types: {6});
+
+    test('sin coincidencias es «sin resultados», sin texto de búsqueda', () {
+      final state = _state(query: filtered);
+
+      expect(state, isA<CatalogNoResults>());
+      final noResults = state as CatalogNoResults;
+      expect(noResults.search, '');
+      expect(noResults.filtered, isTrue);
+      expect(noResults.searching, isFalse);
+    });
+
+    test('con búsqueda y filtros conserva ambos datos', () {
+      final state = _state(
+        query: const PokemonQuery(search: 'reg', types: {6}),
+      );
+
+      expect((state as CatalogNoResults).search, 'reg');
+      expect(state.filtered, isTrue);
+    });
+
+    test('una búsqueda sin filtros no marca «filtrado»', () {
+      final state = _state(query: const PokemonQuery(search: 'reg'));
+
+      expect((state as CatalogNoResults).filtered, isFalse);
+    });
+
+    test('no depende de la sync ni de la conexión', () {
+      expect(
+        _state(
+          query: filtered,
+          sync: SyncStatus.fallida,
+          service: ServiceStatus.servicioNoDisponible,
+        ),
+        isA<CatalogNoResults>(),
+      );
+    });
+
+    test('con coincidencias muestra la lista', () {
+      expect(
+        _state(query: filtered, pokemon: const AsyncData([_regirock])),
+        isA<CatalogLoaded>(),
+      );
+    });
+
+    test('solo cambiar el orden no cuenta como filtro', () {
+      expect(
+        _state(
+          query: const PokemonQuery(sort: PokemonSort.name),
+          service: ServiceStatus.offline,
+        ),
+        isA<CatalogEmpty>(),
+      );
+    });
+  });
 }

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/database/app_database.dart';
+import 'package:regi_dex/core/database/preference_keys.dart';
 import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_local_source.dart';
@@ -591,6 +592,91 @@ void main() {
         expect(remote.searches, isEmpty);
       },
     );
+
+    test(
+      'grupo huevo Mineral y tipo Roca a través de los proveedores (PA-18)',
+      () async {
+        await start(ServiceStatus.offline);
+        await seedFilterCatalog(db);
+
+        final c = container.read(catalogQueryProvider.notifier);
+        c.toggle(FilterCategory.eggGroups, 3);
+        c.toggle(FilterCategory.types, 6);
+        for (var i = 0; i < 5; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+
+        expect(names(container.read(catalogStateProvider)), [
+          'geodude',
+          'golem',
+        ]);
+      },
+    );
+
+    test(
+      'filtros y orden se guardan y la sesión siguiente los recupera',
+      () async {
+        await start(ServiceStatus.offline);
+        await seedFilterCatalog(db);
+        final c = container.read(catalogQueryProvider.notifier);
+        c.toggle(FilterCategory.types, 6);
+        c.setSort(PokemonSort.baseTotal);
+        c.setDescending(true);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        // Sesión nueva sobre la misma base.
+        final next = _container([
+          appDatabaseProvider.overrideWithValue(db),
+          pokemonRemoteSourceProvider.overrideWithValue(remote),
+          serviceStatusProvider.overrideWith(
+            (ref) => Stream.value(
+              const ConnectivitySnapshot(status: ServiceStatus.offline),
+            ),
+          ),
+          syncStatusProvider.overrideWith(
+            (ref) => Stream.value(SyncStatus.inactiva),
+          ),
+        ]);
+        next.listen(catalogStateProvider, (_, _) {});
+        await next.read(savedQueryProvider.future);
+        for (var i = 0; i < 5; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+
+        expect(
+          next.read(catalogQueryProvider),
+          const PokemonQuery(
+            types: {6},
+            sort: PokemonSort.baseTotal,
+            descending: true,
+          ),
+        );
+        expect(names(next.read(catalogStateProvider)), [
+          'regirock',
+          'golem',
+          'geodude',
+        ]);
+      },
+    );
+
+    test('quitar todo borra lo guardado', () async {
+      await start(ServiceStatus.offline);
+      final c = container.read(catalogQueryProvider.notifier);
+      c.toggle(FilterCategory.types, 6);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogQuery),
+        isNotNull,
+      );
+
+      c.clearFilters();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogQuery),
+        isNull,
+      );
+    });
 
     test(
       'con red y sin coincidencias locales consulta, guarda y muestra',
