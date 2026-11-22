@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/database/app_database.dart';
+import 'package:regi_dex/core/database/preference_keys.dart';
 import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_local_source.dart';
@@ -50,12 +51,43 @@ class _Repo extends FakePokemonRepository {
   }
 }
 
+class _FailingSave extends FakePokemonRepository {
+  @override
+  Future<void> saveQuery(PokemonQuery query) async =>
+      throw Exception('disco lleno');
+}
+
+class _SlowLoadRepo extends FakePokemonRepository {
+  _SlowLoadRepo(this._load);
+
+  final Future<PokemonQuery> _load;
+
+  @override
+  Future<PokemonQuery> loadQuery() => _load;
+
+  @override
+  Stream<List<Pokemon>> watchPokemon(PokemonQuery query) {
+    queries.add(query);
+    return Stream.value(const []);
+  }
+}
+
 const _pikachu = Pokemon(
   id: 25,
   name: 'pikachu',
   baseStatTotal: 320,
   types: [],
 );
+
+/// Contenedor con un repositorio falso, sin base ni red.
+ProviderContainer _fakeContainer([FakePokemonRepository? repo]) =>
+    ProviderContainer(
+      overrides: [
+        pokemonRepositoryProvider.overrideWithValue(
+          repo ?? FakePokemonRepository(),
+        ),
+      ],
+    );
 
 ProviderContainer _container(List overrides) {
   final container = ProviderContainer(overrides: List.from(overrides));
@@ -67,8 +99,9 @@ void main() {
   group('debounce de 350 ms', () {
     test('la consulta cambia 350 ms después de la última pulsación', () {
       fakeAsync((async) {
-        final container = ProviderContainer();
+        final container = _fakeContainer();
         container.listen(catalogQueryProvider, (_, _) {});
+        async.flushMicrotasks();
         final search = container.read(catalogQueryProvider.notifier);
 
         search.setText('p');
@@ -85,12 +118,13 @@ void main() {
 
     test('muchas pulsaciones seguidas producen un solo cambio', () {
       fakeAsync((async) {
-        final container = ProviderContainer();
+        final container = _fakeContainer();
         final changes = <String>[];
         container.listen(
           catalogQueryProvider,
           (_, next) => changes.add(next.search),
         );
+        async.flushMicrotasks();
         final search = container.read(catalogQueryProvider.notifier);
 
         for (final text in ['p', 'pi', 'pik', 'pika']) {
@@ -106,8 +140,9 @@ void main() {
 
     test('borrar es inmediato y cancela la búsqueda pendiente', () {
       fakeAsync((async) {
-        final container = ProviderContainer();
+        final container = _fakeContainer();
         container.listen(catalogQueryProvider, (_, _) {});
+        async.flushMicrotasks();
         final search = container.read(catalogQueryProvider.notifier);
         search.setText('pika');
         async.elapse(const Duration(milliseconds: 400));
@@ -125,8 +160,9 @@ void main() {
 
     test('al cerrar el contenedor se cancela lo pendiente', () {
       fakeAsync((async) {
-        final container = ProviderContainer();
+        final container = _fakeContainer();
         container.listen(catalogQueryProvider, (_, _) {});
+        async.flushMicrotasks();
         container.read(catalogQueryProvider.notifier).setText('pika');
 
         container.dispose();
@@ -153,6 +189,162 @@ void main() {
       expect(repo.queries, [
         const PokemonQuery(),
         const PokemonQuery(search: 'pika'),
+      ]);
+    });
+  });
+
+  group('filtros, orden y persistencia (RF-FIL-04)', () {
+    late FakePokemonRepository repo;
+    late ProviderContainer container;
+
+    CatalogSearch controller() => container.read(catalogQueryProvider.notifier);
+    PokemonQuery query() => container.read(catalogQueryProvider);
+
+    Future<void> start([PokemonQuery stored = const PokemonQuery()]) async {
+      repo = FakePokemonRepository()..storedQuery = stored;
+      container = _fakeContainer(repo);
+      container.listen(catalogQueryProvider, (_, _) {});
+      await container.read(savedQueryProvider.future);
+      await pumpEventQueue();
+    }
+
+    test('arranca con lo guardado en la sesión anterior', () async {
+      const stored = PokemonQuery(
+        search: 'reg',
+        types: {6},
+        sort: PokemonSort.baseTotal,
+        descending: true,
+      );
+
+      await start(stored);
+
+      expect(query(), stored);
+    });
+
+    test('sin nada guardado arranca con la consulta por defecto', () async {
+      await start();
+
+      expect(query(), const PokemonQuery());
+    });
+
+    test('toggle agrega y quita un valor de cada categoría', () async {
+      await start();
+
+      controller().toggle(FilterCategory.types, 6);
+      controller().toggle(FilterCategory.types, 5);
+      controller().toggle(FilterCategory.generations, 1);
+      controller().toggle(FilterCategory.eggGroups, 3);
+      controller().toggle(FilterCategory.abilities, 69);
+      expect(query().types, {6, 5});
+      expect(query().generations, {1});
+      expect(query().eggGroups, {3});
+      expect(query().abilities, {69});
+
+      controller().toggle(FilterCategory.types, 6);
+      expect(query().types, {5});
+    });
+
+    test('el estado nunca se puede modificar por fuera', () async {
+      await start();
+      controller().toggle(FilterCategory.types, 6);
+
+      expect(() => query().types.add(1), throwsUnsupportedError);
+    });
+
+    test('setSort cambia el campo y conserva el sentido', () async {
+      await start();
+
+      controller().setDescending(true);
+      controller().setSort(PokemonSort.name);
+
+      expect(query().sort, PokemonSort.name);
+      expect(query().descending, isTrue);
+    });
+
+    test('setDescending fija el sentido del orden', () async {
+      await start();
+
+      controller().setDescending(true);
+      expect(query().descending, isTrue);
+      controller().setDescending(false);
+      expect(query().descending, isFalse);
+    });
+
+    test(
+      'clearFilters quita las categorías y conserva búsqueda y orden',
+      () async {
+        await start(
+          const PokemonQuery(
+            search: 'reg',
+            types: {6},
+            eggGroups: {3},
+            sort: PokemonSort.name,
+          ),
+        );
+
+        controller().clearFilters();
+
+        expect(
+          query(),
+          const PokemonQuery(search: 'reg', sort: PokemonSort.name),
+        );
+      },
+    );
+
+    test('cada cambio se guarda', () async {
+      await start();
+
+      controller().toggle(FilterCategory.types, 6);
+      controller().setSort(PokemonSort.name);
+      controller().clear();
+      await pumpEventQueue();
+
+      expect(repo.savedQueries, [
+        const PokemonQuery(types: {6}),
+        const PokemonQuery(types: {6}, sort: PokemonSort.name),
+        const PokemonQuery(types: {6}, sort: PokemonSort.name),
+      ]);
+    });
+
+    test('la búsqueda se guarda al pasar el debounce, no antes', () async {
+      await start();
+
+      controller().setText('pika');
+      await pumpEventQueue();
+      expect(repo.savedQueries, isEmpty);
+
+      await Future<void>.delayed(
+        CatalogSearch.debounce + const Duration(milliseconds: 50),
+      );
+      expect(repo.savedQueries, [const PokemonQuery(search: 'pika')]);
+    });
+
+    test('si guardar falla no se rompe nada', () async {
+      await start();
+      final failing = _FailingSave();
+      container = _fakeContainer(failing);
+      container.listen(catalogQueryProvider, (_, _) {});
+      await container.read(savedQueryProvider.future);
+
+      controller().toggle(FilterCategory.types, 6);
+      await pumpEventQueue();
+
+      expect(query().types, {6});
+    });
+
+    test('la lista espera a leer lo guardado antes de consultar', () async {
+      final gate = Completer<PokemonQuery>();
+      final repo = _SlowLoadRepo(gate.future);
+      final container = _fakeContainer(repo);
+      container.listen(catalogResultsProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(repo.queries, isEmpty);
+
+      gate.complete(const PokemonQuery(types: {6}));
+      await pumpEventQueue();
+
+      expect(repo.queries, [
+        const PokemonQuery(types: {6}),
       ]);
     });
   });
@@ -400,6 +592,91 @@ void main() {
         expect(remote.searches, isEmpty);
       },
     );
+
+    test(
+      'grupo huevo Mineral y tipo Roca a través de los proveedores (PA-18)',
+      () async {
+        await start(ServiceStatus.offline);
+        await seedFilterCatalog(db);
+
+        final c = container.read(catalogQueryProvider.notifier);
+        c.toggle(FilterCategory.eggGroups, 3);
+        c.toggle(FilterCategory.types, 6);
+        for (var i = 0; i < 5; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+
+        expect(names(container.read(catalogStateProvider)), [
+          'geodude',
+          'golem',
+        ]);
+      },
+    );
+
+    test(
+      'filtros y orden se guardan y la sesión siguiente los recupera',
+      () async {
+        await start(ServiceStatus.offline);
+        await seedFilterCatalog(db);
+        final c = container.read(catalogQueryProvider.notifier);
+        c.toggle(FilterCategory.types, 6);
+        c.setSort(PokemonSort.baseTotal);
+        c.setDescending(true);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        // Sesión nueva sobre la misma base.
+        final next = _container([
+          appDatabaseProvider.overrideWithValue(db),
+          pokemonRemoteSourceProvider.overrideWithValue(remote),
+          serviceStatusProvider.overrideWith(
+            (ref) => Stream.value(
+              const ConnectivitySnapshot(status: ServiceStatus.offline),
+            ),
+          ),
+          syncStatusProvider.overrideWith(
+            (ref) => Stream.value(SyncStatus.inactiva),
+          ),
+        ]);
+        next.listen(catalogStateProvider, (_, _) {});
+        await next.read(savedQueryProvider.future);
+        for (var i = 0; i < 5; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+
+        expect(
+          next.read(catalogQueryProvider),
+          const PokemonQuery(
+            types: {6},
+            sort: PokemonSort.baseTotal,
+            descending: true,
+          ),
+        );
+        expect(names(next.read(catalogStateProvider)), [
+          'regirock',
+          'golem',
+          'geodude',
+        ]);
+      },
+    );
+
+    test('quitar todo borra lo guardado', () async {
+      await start(ServiceStatus.offline);
+      final c = container.read(catalogQueryProvider.notifier);
+      c.toggle(FilterCategory.types, 6);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogQuery),
+        isNotNull,
+      );
+
+      c.clearFilters();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogQuery),
+        isNull,
+      );
+    });
 
     test(
       'con red y sin coincidencias locales consulta, guarda y muestra',

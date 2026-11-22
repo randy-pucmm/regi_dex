@@ -1,6 +1,7 @@
 import 'package:clock/clock.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/preference_keys.dart';
 import '../../../core/sync/sync_coordinator.dart';
 import 'content_hash.dart';
 import 'pokemon_detail_mapper.dart';
@@ -26,9 +27,12 @@ class CatalogLocalSource {
   Future<int> readCursor(String resourceKey) async =>
       (await _db.syncMetadataDao.getEntry(resourceKey))?.cursorOffset ?? 0;
 
-  /// Guarda los datos de referencia en una sola transacción.
-  Future<void> saveReference(ReferenceRecords records) =>
-      _db.referenceDao.upsertReferenceData(
+  /// Guarda los datos de referencia y el total de Pokémon que informa la API en
+  /// una sola transacción. El total es la base del aviso «N de T disponibles
+  /// sin conexión».
+  Future<void> saveReference(ReferenceRecords records) {
+    return _db.transaction(() async {
+      await _db.referenceDao.upsertReferenceData(
         generations: records.generations,
         types: records.types,
         eggGroups: records.eggGroups,
@@ -37,6 +41,20 @@ class CatalogLocalSource {
         versionGroups: records.versionGroups,
         typeEfficacies: records.typeEfficacies,
       );
+      await _db.preferenceDao.setValue(
+        PreferenceKeys.catalogTotal,
+        '${records.totalPokemon}',
+      );
+    });
+  }
+
+  /// Hay un total de Pokémon guardado. Las referencias descargadas antes de que
+  /// existiera no lo tienen y se vuelven a pedir una vez.
+  Future<bool> hasCatalogTotal() async =>
+      int.tryParse(
+        await _db.preferenceDao.getValue(PreferenceKeys.catalogTotal) ?? '',
+      ) !=
+      null;
 
   /// Pokémon del catálogo con ese id, o null si no está.
   Future<PokemonRow?> readPokemon(int id) => _db.catalogDao.getPokemon(id);
