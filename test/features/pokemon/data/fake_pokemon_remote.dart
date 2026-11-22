@@ -17,6 +17,28 @@ class FakePokemonRemote implements PokemonRemoteSource {
   /// Permite alterar la página antes de entregarla.
   void Function(Map<String, dynamic> page)? tamper;
 
+  /// Búsquedas pedidas con [searchPokemon], en orden: `nombre:x` o `numero:n`.
+  final searches = <String>[];
+
+  /// Ids que devuelve [searchPokemon] (el Pokémon sintético de cada id).
+  var searchResultIds = <int>[];
+
+  /// Falla [searchPokemon] con [NetworkFailure] mientras sea true.
+  var failSearch = false;
+
+  @override
+  Future<Map<String, dynamic>> searchPokemon({
+    String? name,
+    int? number,
+    int limit = PokemonRemoteSource.searchLimit,
+  }) async {
+    searches.add(name != null ? 'nombre:$name' : 'numero:$number');
+    if (failSearch) throw const NetworkFailure();
+    return {
+      'pokemon': [for (final id in searchResultIds) syntheticPokemon(id)],
+    };
+  }
+
   /// Ids pedidos con [fetchDetail], en orden.
   final detailIds = <int>[];
 

@@ -463,4 +463,11 @@ class _FailingReference implements PokemonRemoteSource {
 
   @override
   Future<Map<String, dynamic>> fetchDetail(int id) => _inner.fetchDetail(id);
+
+  @override
+  Future<Map<String, dynamic>> searchPokemon({
+    String? name,
+    int? number,
+    int limit = PokemonRemoteSource.searchLimit,
+  }) => _inner.searchPokemon(name: name, number: number, limit: limit);
 }

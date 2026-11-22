@@ -1,9 +1,13 @@
 # Respaldo online de la búsqueda: solo se usa cuando el término no existe en la
-# base local y el servicio está disponible. El resultado se persiste antes de
-# mostrarse (la UI nunca consume esta respuesta directamente).
-query SearchPokemonRemote($pattern: String!, $limit: Int!) {
+# base local y el servicio está disponible. Busca por nombre ($pattern, con
+# comodines de `_ilike`) o por número nacional ($id; 0 si se busca por nombre).
+# El resultado se persiste antes de mostrarse (la UI nunca lo consume directamente).
+query SearchPokemonRemote($pattern: String!, $id: Int!, $limit: Int!) {
   pokemon(
-    where: { is_default: { _eq: true }, name: { _ilike: $pattern } }
+    where: {
+      is_default: { _eq: true }
+      _or: [{ name: { _ilike: $pattern } }, { id: { _eq: $id } }]
+    }
     order_by: { id: asc }
     limit: $limit
   ) {
