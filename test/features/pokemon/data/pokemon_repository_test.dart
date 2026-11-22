@@ -164,6 +164,54 @@ void main() {
     });
   });
 
+  group('watchPokemon con filtros y orden (PA-18)', () {
+    Future<List<String>> names(PokemonQuery query) async => [
+      for (final p in await repository.watchPokemon(query).first) p.name,
+    ];
+
+    setUp(() => seedFilterCatalog(db));
+
+    test('grupo huevo Mineral y tipo Roca devuelve Geodude y Golem', () async {
+      expect(await names(const PokemonQuery(eggGroups: {3}, types: {6})), [
+        'geodude',
+        'golem',
+      ]);
+    });
+
+    test('el orden por total base descendente llega a la lista', () async {
+      final result = await names(
+        const PokemonQuery(
+          types: {6},
+          sort: PokemonSort.baseTotal,
+          descending: true,
+        ),
+      );
+
+      expect(result, ['regirock', 'golem', 'geodude']);
+    });
+
+    test('filtros, orden y búsqueda a la vez', () async {
+      final result = await names(
+        const PokemonQuery(
+          search: 'g',
+          generations: {1},
+          sort: PokemonSort.name,
+          descending: true,
+        ),
+      );
+
+      expect(result, ['golem', 'geodude']);
+    });
+
+    test('los tipos de cada resultado siguen completos', () async {
+      final result = await repository
+          .watchPokemon(const PokemonQuery(types: {5}))
+          .first;
+
+      expect(result.first.types.map((t) => t.name), ['rock', 'ground']);
+    });
+  });
+
   group('searchRemote', () {
     // Las claves foráneas del Pokémon exigen la referencia ya descargada.
     setUp(

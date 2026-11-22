@@ -8,9 +8,23 @@ part 'catalog_dao.g.dart';
 /// Un Pokémon con sus tipos ya resueltos, por orden de slot.
 typedef PokemonWithTypes = ({PokemonRow pokemon, List<TypeRow> types});
 
-/// Qué Pokémon del catálogo se piden. Sin campos devuelve todos.
+/// Campo por el que se ordena el catálogo.
+enum CatalogOrder { number, name, baseTotal }
+
+/// Qué Pokémon del catálogo se piden y en qué orden. Sin campos devuelve todos
+/// por número. Cada conjunto de ids filtra una categoría (basta uno de sus
+/// valores) y las categorías se combinan con Y.
 class CatalogCriteria {
-  const CatalogCriteria({this.number, this.namePart});
+  const CatalogCriteria({
+    this.number,
+    this.namePart,
+    this.typeIds = const {},
+    this.generationIds = const {},
+    this.eggGroupIds = const {},
+    this.abilityIds = const {},
+    this.order = CatalogOrder.number,
+    this.descending = false,
+  });
 
   /// Número nacional exacto.
   final int? number;
@@ -18,14 +32,39 @@ class CatalogCriteria {
   /// Trozo del nombre, sin distinguir mayúsculas.
   final String? namePart;
 
+  final Set<int> typeIds;
+  final Set<int> generationIds;
+  final Set<int> eggGroupIds;
+  final Set<int> abilityIds;
+  final CatalogOrder order;
+  final bool descending;
+
   @override
   bool operator ==(Object other) =>
       other is CatalogCriteria &&
       other.number == number &&
-      other.namePart == namePart;
+      other.namePart == namePart &&
+      _same(other.typeIds, typeIds) &&
+      _same(other.generationIds, generationIds) &&
+      _same(other.eggGroupIds, eggGroupIds) &&
+      _same(other.abilityIds, abilityIds) &&
+      other.order == order &&
+      other.descending == descending;
 
   @override
-  int get hashCode => Object.hash(number, namePart);
+  int get hashCode => Object.hash(
+    number,
+    namePart,
+    Object.hashAllUnordered(typeIds),
+    Object.hashAllUnordered(generationIds),
+    Object.hashAllUnordered(eggGroupIds),
+    Object.hashAllUnordered(abilityIds),
+    order,
+    descending,
+  );
+
+  static bool _same(Set<int> a, Set<int> b) =>
+      a.length == b.length && a.containsAll(b);
 }
 
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
@@ -49,12 +88,18 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   Stream<List<PokemonRow>> watchAllPokemon() =>
       (select(pokemons)..orderBy([(p) => OrderingTerm.asc(p.id)])).watch();
 
-  /// Los Pokémon que cumplen [criteria] (todos si está vacía) por id, cada uno
-  /// con sus tipos por slot (uno o dos; la lista queda vacía si aún no tiene).
-  /// Es una sola consulta con join: vuelve a emitir cuando cambia el catálogo o
-  /// la tabla de tipos, y como cada lote de la sincronización es una
-  /// transacción, emite una vez por lote. El nombre se busca con `instr` sobre
-  /// el nombre en minúsculas: «contiene», sin comodines que escapar.
+  /// Los Pokémon que cumplen [criteria] (todos si está vacía) en el orden
+  /// pedido, cada uno con sus tipos por slot (uno o dos; la lista queda vacía
+  /// si aún no tiene). Es una sola consulta con join: vuelve a emitir cuando
+  /// cambia el catálogo o la tabla de tipos, y como cada lote de la
+  /// sincronización es una transacción, emite una vez por lote.
+  ///
+  /// El nombre se busca con `instr` sobre el nombre en minúsculas («contiene»,
+  /// sin comodines que escapar). Los filtros por tipo, generación, grupo huevo
+  /// y habilidad usan `EXISTS` sobre las tablas puente: así el join de tipos
+  /// solo sirve para mostrar y no recorta el segundo tipo de cada Pokémon. Se
+  /// ordena por el campo pedido, luego por id y por slot, de modo que las filas
+  /// de un mismo Pokémon quedan juntas.
   Stream<List<PokemonWithTypes>> watchPokemonWithTypes([
     CatalogCriteria criteria = const CatalogCriteria(),
   ]) {
@@ -72,7 +117,9 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
           ])
           ..where(_matches(criteria))
           ..orderBy([
-            OrderingTerm.asc(pokemons.id),
+            _primaryOrder(criteria),
+            if (criteria.order != CatalogOrder.number)
+              OrderingTerm.asc(pokemons.id),
             OrderingTerm.asc(pokemonTypes.slot),
           ]);
 
@@ -91,6 +138,22 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     });
   }
 
+  /// Primer criterio de orden de [criteria].
+  OrderingTerm _primaryOrder(CatalogCriteria criteria) {
+    final mode = criteria.descending ? OrderingMode.desc : OrderingMode.asc;
+    return switch (criteria.order) {
+      CatalogOrder.number => OrderingTerm(expression: pokemons.id, mode: mode),
+      CatalogOrder.name => OrderingTerm(
+        expression: pokemons.name.collate(Collate.noCase),
+        mode: mode,
+      ),
+      CatalogOrder.baseTotal => OrderingTerm(
+        expression: pokemons.baseStatTotal,
+        mode: mode,
+      ),
+    };
+  }
+
   /// Condición de [criteria] sobre `pokemon`; verdadera si no pide nada.
   Expression<bool> _matches(CatalogCriteria criteria) {
     Expression<bool> where = const Constant(true);
@@ -104,6 +167,58 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
             pokemons.name.lower(),
             Variable<String>(namePart),
           ]).isBiggerThanValue(0);
+    }
+    if (criteria.typeIds.isNotEmpty) {
+      final pt = pokemonTypes.createAlias('pt');
+      where =
+          where &
+          existsQuery(
+            selectOnly(pt)
+              ..addColumns([pt.pokemonId])
+              ..where(
+                pt.pokemonId.equalsExp(pokemons.id) &
+                    pt.typeId.isIn(criteria.typeIds),
+              ),
+          );
+    }
+    if (criteria.generationIds.isNotEmpty) {
+      final sp = species.createAlias('sp');
+      where =
+          where &
+          existsQuery(
+            selectOnly(sp)
+              ..addColumns([sp.id])
+              ..where(
+                sp.id.equalsExp(pokemons.speciesId) &
+                    sp.generationId.isIn(criteria.generationIds),
+              ),
+          );
+    }
+    if (criteria.eggGroupIds.isNotEmpty) {
+      final eg = speciesEggGroups.createAlias('eg');
+      where =
+          where &
+          existsQuery(
+            selectOnly(eg)
+              ..addColumns([eg.speciesId])
+              ..where(
+                eg.speciesId.equalsExp(pokemons.speciesId) &
+                    eg.eggGroupId.isIn(criteria.eggGroupIds),
+              ),
+          );
+    }
+    if (criteria.abilityIds.isNotEmpty) {
+      final pa = pokemonAbilities.createAlias('pa');
+      where =
+          where &
+          existsQuery(
+            selectOnly(pa)
+              ..addColumns([pa.pokemonId])
+              ..where(
+                pa.pokemonId.equalsExp(pokemons.id) &
+                    pa.abilityId.isIn(criteria.abilityIds),
+              ),
+          );
     }
     return where;
   }

@@ -128,3 +128,126 @@ Future<void> seedSearchCatalog(AppDatabase db) async {
   await upsertSimplePokemon(db, 377, 'regirock');
   await upsertSimplePokemon(db, 378, 'regice');
 }
+
+/// Referencia para los catálogos de filtros: generaciones 1 a 3, tipos, grupos
+/// huevo y habilidades con los ids que usa [seedFilterCatalog].
+Future<void> seedFilterReference(AppDatabase db) {
+  return db.referenceDao.upsertReferenceData(
+    generations: [
+      for (final (id, name, region) in const [
+        (1, 'generation-i', 'kanto'),
+        (2, 'generation-ii', 'johto'),
+        (3, 'generation-iii', 'hoenn'),
+      ])
+        GenerationsCompanion.insert(
+          id: Value(id),
+          name: name,
+          region: Value(region),
+        ),
+    ],
+    types: [
+      for (final (id, name) in const [
+        (3, 'flying'),
+        (5, 'ground'),
+        (6, 'rock'),
+        (10, 'fire'),
+        (12, 'grass'),
+        (13, 'electric'),
+        (15, 'ice'),
+      ])
+        TypesCompanion.insert(id: Value(id), name: name),
+    ],
+    eggGroups: [
+      for (final (id, name) in const [
+        (1, 'monster'),
+        (2, 'dragon'),
+        (3, 'mineral'),
+        (4, 'field'),
+        (5, 'undiscovered'),
+      ])
+        EggGroupsCompanion.insert(id: Value(id), name: name),
+    ],
+    abilities: [
+      for (final (id, name) in const [
+        (5, 'sturdy'),
+        (9, 'static'),
+        (29, 'clear-body'),
+        (66, 'blaze'),
+        (69, 'rock-head'),
+      ])
+        AbilitiesCompanion.insert(id: Value(id), name: name),
+    ],
+  );
+}
+
+/// Inserta un Pokémon completo (especie, grupos huevo, tipos y habilidades)
+/// para probar filtros y orden; requiere [seedFilterReference].
+Future<void> upsertFilterPokemon(
+  AppDatabase db,
+  int id,
+  String name, {
+  required int generation,
+  required List<int> types,
+  required List<int> eggGroups,
+  required List<int> abilities,
+  required int total,
+}) async {
+  await db.catalogDao.upsertSpecies(
+    SpeciesCompanion.insert(
+      id: Value(id),
+      name: name.toLowerCase(),
+      generationId: generation,
+    ),
+  );
+  await db.catalogDao.replaceSpeciesEggGroups(id, eggGroups);
+  await db.catalogDao.upsertPokemon(
+    PokemonsCompanion.insert(
+      id: Value(id),
+      speciesId: id,
+      name: name,
+      baseStatTotal: Value(total),
+      lightSyncedAt: DateTime(2026, 11, 3, 10),
+    ),
+    types: [
+      for (final (index, typeId) in types.indexed)
+        (slot: index + 1, typeId: typeId),
+    ],
+    stats: const [],
+    abilities: [
+      for (final (index, abilityId) in abilities.indexed)
+        (slot: index + 1, abilityId: abilityId, isHidden: false),
+    ],
+  );
+}
+
+/// Siete Pokémon de tres generaciones para probar filtros y orden:
+/// Charizard, Pikachu, Geodude y Golem (gen. 1), Chikorita (gen. 2), y Regirock
+/// y Regice (gen. 3). Geodude, Golem y Regirock son de roca.
+Future<void> seedFilterCatalog(AppDatabase db) async {
+  await seedFilterReference(db);
+  Future<void> add(
+    int id,
+    String name,
+    int generation,
+    List<int> types,
+    List<int> eggGroups,
+    List<int> abilities,
+    int total,
+  ) => upsertFilterPokemon(
+    db,
+    id,
+    name,
+    generation: generation,
+    types: types,
+    eggGroups: eggGroups,
+    abilities: abilities,
+    total: total,
+  );
+  await add(6, 'charizard', 1, [10, 3], [1, 2], [66], 534);
+  await add(25, 'pikachu', 1, [13], [4], [9], 320);
+  await add(74, 'geodude', 1, [6, 5], [3], [69, 5], 300);
+  await add(76, 'golem', 1, [6, 5], [3], [69, 5], 495);
+  await add(152, 'chikorita', 2, [12], [1], [66], 318);
+  await add(377, 'regirock', 3, [6], [5], [5], 580);
+  await add(378, 'regice', 3, [15], [5], [29], 580);
+}

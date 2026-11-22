@@ -48,12 +48,25 @@ class PokemonRepositoryImpl implements PokemonRepository {
     return term == null ? 0 : _search.run(term);
   }
 
-  /// Traduce la búsqueda del dominio a lo que entiende el DAO.
-  CatalogCriteria _criteriaOf(PokemonQuery query) => switch (query.term) {
-    SearchNumber(:final number) => CatalogCriteria(number: number),
-    SearchName(:final text) => CatalogCriteria(namePart: text),
-    null => const CatalogCriteria(),
-  };
+  /// Traduce la consulta del dominio (búsqueda, filtros y orden) a lo que
+  /// entiende el DAO.
+  CatalogCriteria _criteriaOf(PokemonQuery query) {
+    final term = query.term;
+    return CatalogCriteria(
+      number: term is SearchNumber ? term.number : null,
+      namePart: term is SearchName ? term.text : null,
+      typeIds: query.types,
+      generationIds: query.generations,
+      eggGroupIds: query.eggGroups,
+      abilityIds: query.abilities,
+      order: switch (query.sort) {
+        PokemonSort.number => CatalogOrder.number,
+        PokemonSort.name => CatalogOrder.name,
+        PokemonSort.baseTotal => CatalogOrder.baseTotal,
+      },
+      descending: query.descending,
+    );
+  }
 
   /// Descarga el detalle de [pokemonId] solo si falta o venció (3 días).
   @override
