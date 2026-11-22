@@ -55,9 +55,11 @@ Stream<R> combineLatest2<A, B, R>(
       firstSub?.resume();
       secondSub?.resume();
     },
-    onCancel: () async {
-      await firstSub?.cancel();
-      await secondSub?.cancel();
+    // Sin esperar: la cancelación de un flujo de Drift puede depender de un
+    // temporizador y no debe bloquear a quien cancela este.
+    onCancel: () {
+      unawaited(firstSub?.cancel());
+      unawaited(secondSub?.cancel());
     },
   );
   return controller.stream;
