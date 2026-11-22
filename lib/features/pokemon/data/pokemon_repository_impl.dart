@@ -22,13 +22,13 @@ class PokemonRepositoryImpl implements PokemonRepository {
   final CatalogSync _sync;
   final DetailSync _detail;
 
-  /// Pokémon de la base local como entidades de dominio. Por ahora [query]
-  /// está vacía y devuelve todo el catálogo por número nacional. Solo emite
+  /// Pokémon de la base local que cumplen [query], como entidades de dominio y
+  /// por número nacional; con la consulta vacía, todo el catálogo. Solo emite
   /// cuando la lista cambia: guardar la referencia toca la tabla de tipos pero
   /// no debe reconstruir la pantalla.
   @override
   Stream<List<Pokemon>> watchPokemon(PokemonQuery query) => _catalog
-      .watchPokemonWithTypes()
+      .watchPokemonWithTypes(_criteriaOf(query))
       .map((items) => [for (final item in items) pokemonFromRows(item)])
       .distinct(samePokemonList);
 
@@ -37,6 +37,13 @@ class PokemonRepositoryImpl implements PokemonRepository {
   @override
   Future<void> refresh() =>
       _coordinator.run<void>(CatalogSync.resourceKey, _sync.execute);
+
+  /// Traduce la búsqueda del dominio a lo que entiende el DAO.
+  CatalogCriteria _criteriaOf(PokemonQuery query) => switch (query.term) {
+    SearchNumber(:final number) => CatalogCriteria(number: number),
+    SearchName(:final text) => CatalogCriteria(namePart: text),
+    null => const CatalogCriteria(),
+  };
 
   /// Descarga el detalle de [pokemonId] solo si falta o venció (3 días).
   @override

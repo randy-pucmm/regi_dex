@@ -59,7 +59,7 @@ final class SearchNumber extends SearchTerm {
   int get hashCode => Object.hash(SearchNumber, number);
 }
 
-/// Trozo del nombre (en minúsculas, sin `%` ni `_` escapados).
+/// Trozo del nombre, ya en minúsculas.
 final class SearchName extends SearchTerm {
   const SearchName(this.text);
 
