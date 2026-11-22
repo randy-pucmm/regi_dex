@@ -19,12 +19,27 @@ import '../../../helpers/ui_test_helpers.dart';
 import '../fake_pokemon_repository.dart';
 
 class _Repo extends FakePokemonRepository {
-  _Repo(this._pokemon);
+  _Repo(this._pokemon, {this.onWatch});
 
   final Stream<List<Pokemon>> _pokemon;
 
+  /// Si se da, decide qué devuelve cada consulta en lugar de [_pokemon].
+  final Stream<List<Pokemon>> Function(PokemonQuery query)? onWatch;
+
+  /// Si no es null, `searchRemote` espera a que se complete.
+  Completer<int>? searchGate;
+
   @override
-  Stream<List<Pokemon>> watchPokemon(PokemonQuery query) => _pokemon;
+  Stream<List<Pokemon>> watchPokemon(PokemonQuery query) {
+    queries.add(query);
+    return onWatch?.call(query) ?? _pokemon;
+  }
+
+  @override
+  Future<int> searchRemote(String search) async {
+    remoteSearches.add(search);
+    return searchGate == null ? 0 : searchGate!.future;
+  }
 }
 
 List<Pokemon> _pokedex(int count) => [
@@ -37,11 +52,12 @@ Future<_Repo> _open(
   Stream<List<Pokemon>>? pokemon,
   SyncStatus sync = SyncStatus.inactiva,
   ServiceStatus service = ServiceStatus.online,
+  Stream<List<Pokemon>> Function(PokemonQuery query)? onWatch,
   Size size = const Size(390, 844),
   double textScale = 1,
 }) async {
   useScreen(tester, size, textScale: textScale);
-  final repo = _Repo(pokemon ?? Stream.value(const []));
+  final repo = _Repo(pokemon ?? Stream.value(const []), onWatch: onWatch);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -198,6 +214,149 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('REINTENTAR'), findsOneWidget);
+    });
+  });
+
+  group('búsqueda', () {
+    /// Una Pokédex de 3 que filtra por el texto buscado, como la base real.
+    Stream<List<Pokemon>> filtered(PokemonQuery query) => Stream.value([
+      for (final p in _pokedex(3))
+        if (p.name.contains(query.search.trim())) p,
+    ]);
+
+    Future<_Repo> openSearch(
+      WidgetTester tester, {
+      ServiceStatus service = ServiceStatus.online,
+      Size size = const Size(390, 844),
+      double textScale = 1,
+    }) => _open(
+      tester,
+      onWatch: filtered,
+      service: service,
+      size: size,
+      textScale: textScale,
+    );
+
+    /// Escribe [text] y deja pasar el debounce.
+    Future<void> type(WidgetTester tester, String text) async {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('con catálogo aparece el campo de búsqueda', (tester) async {
+      await openSearch(tester);
+
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.bySemanticsLabel('Buscar por nombre o número'), findsOne);
+      expect(find.byType(PokemonTile), findsNWidgets(3));
+    });
+
+    testWidgets('sin catálogo todavía no hay campo', (tester) async {
+      await _open(tester, sync: SyncStatus.sincronizando);
+
+      expect(find.byType(TextField), findsNothing);
+    });
+
+    testWidgets('no consulta hasta pasados 350 ms', (tester) async {
+      final repo = await openSearch(tester);
+      repo.queries.clear();
+
+      await tester.enterText(find.byType(TextField), 'pokemon2');
+      await tester.pump(const Duration(milliseconds: 349));
+      expect(repo.queries, isEmpty);
+      expect(find.byType(PokemonTile), findsNWidgets(3));
+
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pumpAndSettle();
+      expect(repo.queries, [const PokemonQuery(search: 'pokemon2')]);
+      expect(find.byType(PokemonTile), findsOneWidget);
+    });
+
+    testWidgets('escribir varias letras seguidas hace una sola consulta', (
+      tester,
+    ) async {
+      final repo = await openSearch(tester);
+      repo.queries.clear();
+
+      for (final text in ['p', 'po', 'pok']) {
+        await tester.enterText(find.byType(TextField), text);
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
+      expect(repo.queries, [const PokemonQuery(search: 'pok')]);
+    });
+
+    testWidgets('sin coincidencias avisa y conserva el campo y el texto', (
+      tester,
+    ) async {
+      await openSearch(tester);
+
+      await type(tester, 'zzz');
+
+      expect(find.text('Sin resultados'), findsOneWidget);
+      expect(find.textContaining('«zzz»'), findsOneWidget);
+      expect(find.byType(PokemonTile), findsNothing);
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.controller!.text, 'zzz');
+    });
+
+    testWidgets('sin conexión avisa de que solo se busca en lo descargado', (
+      tester,
+    ) async {
+      final repo = await openSearch(tester, service: ServiceStatus.offline);
+
+      await type(tester, 'zzz');
+
+      expect(find.text('Sin resultados'), findsOneWidget);
+      expect(find.textContaining('Sin conexión'), findsOneWidget);
+      expect(repo.remoteSearches, isEmpty);
+    });
+
+    testWidgets('con conexión consulta a PokéAPI y muestra «Buscando…»', (
+      tester,
+    ) async {
+      final repo = await openSearch(tester);
+      repo.searchGate = Completer<int>();
+
+      await type(tester, 'zzz');
+
+      expect(repo.remoteSearches, ['zzz']);
+      expect(find.text('Buscando…'), findsOneWidget);
+      expect(find.text('Sin resultados'), findsNothing);
+
+      repo.searchGate!.complete(0);
+      await tester.pumpAndSettle();
+      expect(find.text('Sin resultados'), findsOneWidget);
+    });
+
+    testWidgets('el botón de borrar limpia al instante y vuelve la lista', (
+      tester,
+    ) async {
+      final repo = await openSearch(tester);
+      expect(find.byTooltip('Borrar búsqueda'), findsNothing);
+      await type(tester, 'zzz');
+      expect(find.text('Sin resultados'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Borrar búsqueda'));
+      await tester.pumpAndSettle();
+
+      expect(repo.queries.last, const PokemonQuery());
+      expect(find.byType(PokemonTile), findsNWidgets(3));
+      expect(find.byTooltip('Borrar búsqueda'), findsNothing);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '',
+      );
+    });
+
+    testWidgets('cabe en 320×568 con el texto al 200 %', (tester) async {
+      await openSearch(tester, size: const Size(320, 568), textScale: 2);
+      await type(tester, 'zzz');
+
+      expect(tester.takeException(), isNull);
     });
   });
 }

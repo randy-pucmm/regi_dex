@@ -7,6 +7,8 @@ import '../../../app/providers.dart';
 import '../../../ui/components/hub_buttons.dart';
 import '../../../ui/tokens/regi_colors.dart';
 import '../domain/pokemon.dart';
+import 'catalog_search.dart';
+import 'catalog_search_field.dart';
 import 'catalog_state.dart';
 import 'pokemon_tile.dart';
 
@@ -17,30 +19,57 @@ class CatalogPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     void retry() => ref.read(refreshCatalogProvider)().ignore();
 
-    return switch (ref.watch(catalogStateProvider)) {
-      CatalogLoaded(:final pokemon) => _PokemonList(
-        pokemon: pokemon,
-        cacheManager: ref.watch(imageCacheManagerProvider),
-      ),
-      CatalogLoading() => const _Message(
-        title: 'Descargando el catálogo…',
-        body: 'La primera vez tarda unos segundos.',
-      ),
-      CatalogEmpty() => _Message(
-        title: 'Aún no hay catálogo',
-        body:
-            'Conéctate a Internet una vez para descargarlo. '
-            'Después funciona sin conexión.',
-        onRetry: retry,
-      ),
-      CatalogError() => _Message(
-        title: 'No se pudo descargar el catálogo',
-        body:
-            'PokéAPI no respondió. La app lo reintenta sola; también puedes '
-            'hacerlo ahora.',
-        onRetry: retry,
-      ),
-    };
+    final state = ref.watch(catalogStateProvider);
+    // El campo se queda mientras haya una búsqueda, aunque la lista se esté
+    // recargando, para no perder lo que se está escribiendo.
+    final showSearch =
+        state is CatalogLoaded ||
+        state is CatalogNoResults ||
+        ref.watch(catalogQueryProvider).search.isNotEmpty;
+
+    return Column(
+      children: [
+        if (showSearch)
+          const CatalogSearchField(key: ValueKey('catalog-search')),
+        Expanded(
+          child: switch (state) {
+            CatalogLoaded(:final pokemon) => _PokemonList(
+              pokemon: pokemon,
+              cacheManager: ref.watch(imageCacheManagerProvider),
+            ),
+            CatalogNoResults(:final search, :final searching, :final offline) =>
+              _Message(
+                title: searching ? 'Buscando…' : 'Sin resultados',
+                body: searching
+                    ? 'Consultando PokéAPI por «$search».'
+                    : offline
+                    ? 'No hay ningún Pokémon descargado con «$search». Sin '
+                          'conexión solo se busca en lo ya descargado.'
+                    : 'No hay ningún Pokémon con «$search». Prueba con otro '
+                          'nombre o con su número nacional.',
+              ),
+            CatalogLoading() => const _Message(
+              title: 'Descargando el catálogo…',
+              body: 'La primera vez tarda unos segundos.',
+            ),
+            CatalogEmpty() => _Message(
+              title: 'Aún no hay catálogo',
+              body:
+                  'Conéctate a Internet una vez para descargarlo. '
+                  'Después funciona sin conexión.',
+              onRetry: retry,
+            ),
+            CatalogError() => _Message(
+              title: 'No se pudo descargar el catálogo',
+              body:
+                  'PokéAPI no respondió. La app lo reintenta sola; también '
+                  'puedes hacerlo ahora.',
+              onRetry: retry,
+            ),
+          },
+        ),
+      ],
+    );
   }
 }
 
