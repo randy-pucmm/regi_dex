@@ -27,6 +27,20 @@ class FakePokemonRepository implements PokemonRepository {
     if (error != null) throw error;
   }
 
+  /// Búsquedas remotas pedidas, en orden.
+  final remoteSearches = <String>[];
+
+  /// Si no es null, `searchRemote()` lo lanza.
+  Object? searchError;
+
+  @override
+  Future<int> searchRemote(String search) async {
+    remoteSearches.add(search);
+    final error = searchError;
+    if (error != null) throw error;
+    return 0;
+  }
+
   @override
   Future<void> syncDetail(int pokemonId) async {
     detailRequests.add(pokemonId);

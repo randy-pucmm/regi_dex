@@ -3,6 +3,7 @@ import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_repository.dart';
 import 'package:regi_dex/features/pokemon/domain/refresh_catalog.dart';
+import 'package:regi_dex/features/pokemon/domain/search_pokemon_remote.dart';
 import 'package:regi_dex/features/pokemon/domain/sync_pokemon_detail.dart';
 import 'package:regi_dex/features/pokemon/domain/watch_pokemon.dart';
 
@@ -20,6 +21,13 @@ class _RecordingRepository implements PokemonRepository {
   Future<void> refresh() async => refreshes++;
 
   final detailRequests = <int>[];
+  final remoteSearches = <String>[];
+
+  @override
+  Future<int> searchRemote(String search) async {
+    remoteSearches.add(search);
+    return 1;
+  }
 
   @override
   Future<void> syncDetail(int pokemonId) async => detailRequests.add(pokemonId);
@@ -84,6 +92,15 @@ void main() {
       await RefreshCatalog(repository)();
 
       expect(repository.refreshes, 1);
+    });
+
+    test('SearchPokemonRemote delega y devuelve lo guardado', () async {
+      final repository = _RecordingRepository();
+
+      final saved = await SearchPokemonRemote(repository)('pika');
+
+      expect(repository.remoteSearches, ['pika']);
+      expect(saved, 1);
     });
 
     test('SyncPokemonDetail pide el detalle del Pokémon indicado', () async {

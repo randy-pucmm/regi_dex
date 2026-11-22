@@ -13,6 +13,13 @@ abstract interface class PokemonRepository {
   /// una en curso se une a ella. Si falla, lanza el `Failure` correspondiente.
   Future<void> refresh();
 
+  /// Busca [search] (nombre o número nacional) en PokéAPI y guarda lo que
+  /// encuentre en la base; `watchPokemon` lo emite después. Devuelve cuántos
+  /// Pokémon guardó. Es el respaldo cuando lo local no tiene resultados: gasta
+  /// una llamada, así que quien lo use debe comprobar antes que hay servicio.
+  /// Si falla lanza el `Failure` y no guarda nada.
+  Future<int> searchRemote(String search);
+
   /// Trae y guarda el detalle de [pokemonId] (con su cadena evolutiva) en una
   /// sola llamada si falta o venció a los 3 días; si está vigente no hace nada.
   /// Si ya hay una descarga de ese Pokémon en curso se une a ella. Si falla,

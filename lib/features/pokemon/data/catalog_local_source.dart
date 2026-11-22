@@ -91,6 +91,28 @@ class CatalogLocalSource {
     });
   }
 
+  /// Guarda [records] en una sola transacción sin tocar ningún cursor: es para
+  /// Pokémon sueltos, como los resultados de una búsqueda remota. Es idempotente
+  /// (upsert por clave primaria) y el siguiente paso del catálogo los reescribe.
+  Future<void> savePokemon(List<PokemonRecord> records) =>
+      _db.transaction(() => _upsertAll(records));
+
+  Future<void> _upsertAll(List<PokemonRecord> records) async {
+    for (final record in records) {
+      await _db.catalogDao.upsertSpecies(record.species);
+      await _db.catalogDao.replaceSpeciesEggGroups(
+        record.species.id.value,
+        record.eggGroupIds,
+      );
+      await _db.catalogDao.upsertPokemon(
+        record.pokemon,
+        types: record.types,
+        stats: record.stats,
+        abilities: record.abilities,
+      );
+    }
+  }
+
   /// Guarda un lote de Pokémon y mueve el cursor de [resourceKey] a
   /// [nextOffset] en **una sola transacción** (PS-07): si algo falla no queda
   /// nada del lote y el cursor sigue donde estaba. Lanza [StateError] si el
@@ -101,19 +123,7 @@ class CatalogLocalSource {
     required int nextOffset,
   }) {
     return _db.transaction(() async {
-      for (final record in records) {
-        await _db.catalogDao.upsertSpecies(record.species);
-        await _db.catalogDao.replaceSpeciesEggGroups(
-          record.species.id.value,
-          record.eggGroupIds,
-        );
-        await _db.catalogDao.upsertPokemon(
-          record.pokemon,
-          types: record.types,
-          stats: record.stats,
-          abilities: record.abilities,
-        );
-      }
+      await _upsertAll(records);
       final moved = await _db.syncMetadataDao.advanceCursor(
         resourceKey,
         nextOffset,

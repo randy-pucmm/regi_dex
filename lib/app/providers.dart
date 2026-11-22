@@ -19,8 +19,10 @@ import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/detail_sync.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
+import '../features/pokemon/data/remote_search.dart';
 import '../features/pokemon/domain/pokemon_repository.dart';
 import '../features/pokemon/domain/refresh_catalog.dart';
+import '../features/pokemon/domain/search_pokemon_remote.dart';
 import '../features/pokemon/domain/sync_pokemon_detail.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
 
@@ -134,6 +136,14 @@ final detailSyncProvider = Provider<DetailSync>(
   ),
 );
 
+/// Respaldo remoto de la búsqueda (una llamada, resultados a la base).
+final remoteSearchProvider = Provider<RemoteSearch>(
+  (ref) => RemoteSearch(
+    remote: ref.watch(pokemonRemoteSourceProvider),
+    local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
+  ),
+);
+
 /// Repositorio del catálogo: lo que la interfaz consume en lugar de GraphQL
 /// o Drift. Las pruebas lo sobrescriben con uno falso.
 final pokemonRepositoryProvider = Provider<PokemonRepository>(
@@ -142,6 +152,7 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>(
     coordinator: ref.watch(syncCoordinatorProvider),
     sync: ref.watch(catalogSyncProvider),
     detail: ref.watch(detailSyncProvider),
+    search: ref.watch(remoteSearchProvider),
   ),
 );
 
@@ -153,6 +164,11 @@ final watchPokemonProvider = Provider<WatchPokemon>(
 /// Caso de uso: sincronizar el catálogo ahora.
 final refreshCatalogProvider = Provider<RefreshCatalog>(
   (ref) => RefreshCatalog(ref.watch(pokemonRepositoryProvider)),
+);
+
+/// Caso de uso: buscar en PokéAPI cuando lo local no tiene resultados.
+final searchPokemonRemoteProvider = Provider<SearchPokemonRemote>(
+  (ref) => SearchPokemonRemote(ref.watch(pokemonRepositoryProvider)),
 );
 
 /// Caso de uso: traer el detalle de un Pokémon al abrirlo.
