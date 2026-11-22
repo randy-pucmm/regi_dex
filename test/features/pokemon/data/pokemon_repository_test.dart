@@ -6,6 +6,7 @@ import 'package:regi_dex/core/sync/sync_coordinator.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_local_source.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_sync.dart';
 import 'package:regi_dex/features/pokemon/data/detail_sync.dart';
+import 'package:regi_dex/features/pokemon/data/pokemon_mapper.dart';
 import 'package:regi_dex/features/pokemon/data/pokemon_repository_impl.dart';
 import 'package:regi_dex/features/pokemon/data/remote_search.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
@@ -13,6 +14,7 @@ import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 
 import '../../../core/database/database_test_helpers.dart';
 import '../../../core/sync/fake_time.dart';
+import 'catalog_test_data.dart';
 import 'fake_pokemon_remote.dart';
 
 void main() {
@@ -163,6 +165,13 @@ void main() {
   });
 
   group('searchRemote', () {
+    // Las claves foráneas del Pokémon exigen la referencia ya descargada.
+    setUp(
+      () =>
+          CatalogLocalSource(db)
+              .saveReference(mapReferenceData(syntheticReference())),
+    );
+
     test('guarda lo encontrado y watchPokemon lo emite', () async {
       remote.searchResultIds = [377];
 
