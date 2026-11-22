@@ -183,7 +183,7 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 | `GetPokemonPage(limit, offset)` | Catálogo ligero paginado. |
 | `GetPokemonDetail(id)` | Detalle completo con cadena evolutiva en **una** llamada. |
 | `GetPokemonsByIds(ids)` | Verificación y restauración de datos alterados (OF-19). |
-| `SearchPokemonRemote(pattern)` | Respaldo online de la búsqueda. |
+| `SearchPokemonRemote(pattern, id)` | Respaldo online de la búsqueda, por nombre o por número nacional. |
 | `HealthCheck` | Disponibilidad real del servicio. |
 
 ## 9. Estrategia de sincronización
@@ -215,11 +215,21 @@ Si algo falla se deshace solo el lote en curso y el siguiente intento reanuda de
 
 El esquema v2 agrega `pokemon_move`, `evolution` y `pokemon_form`, además de las columnas shiny de `pokemon`. La pantalla de detalle solo debe leer de la base.
 
-**Repositorio y arranque.** La interfaz no ve GraphQL ni Drift: consume `PokemonRepository` (contrato en `domain`) mediante los casos de uso `WatchPokemon`, `RefreshCatalog` y `SyncPokemonDetail`.
+**Búsqueda.** Se hace siempre sobre la base local, así que funciona sin conexión.
 
-- `watchPokemon(query)` emite entidades `Pokemon` con sus tipos desde la base local, una vez por lote confirmado y solo cuando la lista cambia. Por ahora la consulta vacía devuelve todo por número nacional; la búsqueda y los filtros la ampliarán.
+1. El campo de la pantalla del catálogo espera **350 ms** desde la última tecla antes de consultar (`CatalogSearch`).
+2. `SearchTerm.parse` interpreta el texto: «25», «#025» o «#0378» son el **número nacional exacto**; cualquier otro texto («pika») busca los nombres que lo **contienen**, sin distinguir mayúsculas. Buscar «377» y «#0378» devuelve Regirock y Regice.
+3. Si no hay coincidencias locales, hay servicio y el catálogo no se está descargando, se consulta `SearchPokemonRemote` una sola vez por texto (una llamada del presupuesto), se **guardan** los resultados en la base sin mover el cursor del catálogo y la pantalla los muestra porque observa la base. Un fallo no rompe nada: queda «Sin resultados».
+4. Con una búsqueda activa y sin resultados se muestra «Sin resultados» (o «Buscando…» mientras se consulta), independientemente del estado de la sincronización.
+
+Limitación: la búsqueda por nombre usa el nombre en inglés de PokéAPI y no usa el índice de nombre; con 1025 filas no se nota.
+
+**Repositorio y arranque.** La interfaz no ve GraphQL ni Drift: consume `PokemonRepository` (contrato en `domain`) mediante los casos de uso `WatchPokemon`, `RefreshCatalog`, `SearchPokemonRemote` y `SyncPokemonDetail`.
+
+- `watchPokemon(query)` emite entidades `Pokemon` con sus tipos desde la base local, una vez por lote confirmado y solo cuando la lista cambia. La consulta vacía devuelve todo por número nacional; con texto de búsqueda, solo lo que coincide. Los filtros y el orden la ampliarán.
 - `refresh()` pide la sincronización al `SyncCoordinator`, que une las solicitudes simultáneas en una sola.
 - `syncDetail(id)` descarga el detalle solo si falta o venció (3 días).
+- `searchRemote(texto)` busca en PokéAPI y guarda lo encontrado en la base.
 - Al abrir la app y cada vez que el servicio pasa a online, `catalogAutoSyncProvider` sincroniza el catálogo si hace falta: nunca se completó, quedó a medias o fallida, o tiene más de 7 días. Se lanza sin esperar, así que no bloquea el arranque. Con el catálogo vigente no hace ninguna llamada.
 
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
