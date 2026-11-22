@@ -224,12 +224,22 @@ El esquema v2 agrega `pokemon_move`, `evolution` y `pokemon_form`, además de la
 
 Limitación: la búsqueda por nombre usa el nombre en inglés de PokéAPI y no usa el índice de nombre; con 1025 filas no se nota.
 
+**Filtros y orden.** El botón junto al buscador abre un panel; los cambios se aplican al instante y se ven en la lista de detrás.
+
+- **Filtros:** tipo, generación, grupo huevo y habilidad. Las categorías se **combinan con «Y»** y, dentro de una categoría, basta **uno** de los valores elegidos. Por ejemplo, grupo huevo «Mineral» y tipo «Roca» devuelve Geodude y Golem (PA-18); tipo «Roca» o «Tierra» devuelve los que tengan cualquiera de los dos.
+- **Orden:** por número, nombre (sin distinguir mayúsculas) o total base, ascendente o descendente; los empates se resuelven por número.
+- Los valores salen de la referencia local, así que el panel funciona sin conexión; hasta la primera descarga solo está disponible el orden. Con más de 300 habilidades, se busca escribiendo y se muestran las que coinciden.
+- Sobre la lista aparece un chip por cada filtro activo, con su ✕, y «Limpiar filtros». Si nada cumple los filtros, la pantalla lo dice y ofrece limpiarlos.
+- **Persistencia (RF-FIL-04):** la búsqueda, los filtros y el orden se guardan en `user_preference` (clave `catalog_query`, un JSON) y se recuperan al abrir la app. Un valor dañado se ignora y se parte de cero. Mientras se lee, la lista espera para no mostrar un instante sin filtros.
+- **Catálogo parcial (RF-FIL-05):** si el dispositivo tiene menos Pokémon que el total, la pantalla avisa «312 de 1025 disponibles sin conexión». El total sale de la última sincronización de referencia (`catalog_total` en `user_preference`); una referencia anterior que no lo tenía se vuelve a pedir una vez.
+
 **Repositorio y arranque.** La interfaz no ve GraphQL ni Drift: consume `PokemonRepository` (contrato en `domain`) mediante los casos de uso `WatchPokemon`, `RefreshCatalog`, `SearchPokemonRemote` y `SyncPokemonDetail`.
 
-- `watchPokemon(query)` emite entidades `Pokemon` con sus tipos desde la base local, una vez por lote confirmado y solo cuando la lista cambia. La consulta vacía devuelve todo por número nacional; con texto de búsqueda, solo lo que coincide. Los filtros y el orden la ampliarán.
+- `watchPokemon(query)` emite entidades `Pokemon` con sus tipos desde la base local, una vez por lote confirmado y solo cuando la lista cambia. La consulta vacía devuelve todo por número nacional; con búsqueda, filtros y orden, solo lo que cumple, en ese orden.
 - `refresh()` pide la sincronización al `SyncCoordinator`, que une las solicitudes simultáneas en una sola.
 - `syncDetail(id)` descarga el detalle solo si falta o venció (3 días).
 - `searchRemote(texto)` busca en PokéAPI y guarda lo encontrado en la base.
+- `watchFilterOptions()` y `watchAvailability()` alimentan el panel de filtros y el aviso de catálogo parcial; `loadQuery()` y `saveQuery()` guardan la consulta entre sesiones.
 - Al abrir la app y cada vez que el servicio pasa a online, `catalogAutoSyncProvider` sincroniza el catálogo si hace falta: nunca se completó, quedó a medias o fallida, o tiene más de 7 días. Se lanza sin esperar, así que no bloquea el arranque. Con el catálogo vigente no hace ninguna llamada.
 
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
@@ -244,6 +254,21 @@ Las **imágenes no se guardan en la base de datos**:
 - Se usa una caché de archivos LRU de 150 MB y 1500 archivos (`RegiImageCacheManager`). La librería expulsa por antigüedad al pasar de 1500 archivos; la clase recorta los bytes sobrantes cada vez que se descarga algo nuevo.
 - `PokemonImage` decodifica al tamaño del contenedor y, sin la imagen en la caché y sin red, muestra el respaldo «Imagen no disponible offline».
 - Los favoritos quedan fijados para uso offline (ADR-004).
+
+**Índices de las consultas del catálogo (RNF-REN-02).** Los filtros se escriben con `EXISTS` sobre las tablas puente, así el join de tipos solo sirve para mostrar y no recorta el segundo tipo de cada Pokémon. Los planes de `EXPLAIN QUERY PLAN` se comprueban en `test/core/database/catalog_query_plans_test.dart`:
+
+| Consulta | Índice que usa |
+|---|---|
+| Filtro por tipo | `idx_pokemon_type_type_id` (`pokemon_type.type_id`) |
+| Filtro por generación | `idx_species_generation_id` (`species.generation_id`), cubriente |
+| Filtro por grupo huevo | clave primaria de `species_egg_group` (`species_id`, `egg_group_id`), cubriente |
+| Filtro por habilidad | `idx_pokemon_ability_ability_id` (`pokemon_ability.ability_id`) |
+| Orden por número | clave primaria de `pokemon`, sin ordenar aparte |
+| Orden por nombre | `idx_pokemon_name_nocase` (`name COLLATE NOCASE`) |
+| Orden por total base | `idx_pokemon_base_stat_total` |
+| Tipos de cada Pokémon | clave primaria de `pokemon_type` (`pokemon_id`, `slot`) |
+| Búsqueda por número | clave primaria de `pokemon` |
+| Búsqueda por nombre («contiene») | ninguno: recorre `pokemon` (1025 filas) |
 
 El modelo de datos completo (diagramas ER) y la política de imágenes están en el [documento de arquitectura](docs/Arquitectura_RegiDex.pdf) (§5).
 
