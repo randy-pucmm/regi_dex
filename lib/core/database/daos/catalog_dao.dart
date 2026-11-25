@@ -259,7 +259,6 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     );
   }
 
-  /// Indica si hay algún movimiento guardado de [pokemonId].
   Future<bool> hasMoves(int pokemonId) async =>
       (await (select(pokemonMoves)
                 ..where((m) => m.pokemonId.equals(pokemonId))
@@ -317,8 +316,6 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         await latestWhere(ofPokemon);
   }
 
-  /// Cantidad de movimientos distintos de [pokemonId] en [versionGroupId] que
-  /// muestra [getMoves] para [methodId].
   Future<int> countMoves(
     int pokemonId, {
     required int versionGroupId,

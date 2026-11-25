@@ -19,8 +19,6 @@ class EvolutionSpecies {
   }
 }
 
-/// Una condición para evolucionar. Una evolución puede tener varias
-/// alternativas.
 class EvolutionStep {
   const EvolutionStep({
     this.trigger,
@@ -36,7 +34,6 @@ class EvolutionStep {
   final String? timeOfDay;
   final String? itemName;
 
-  /// La condición en texto, o vacío si no se conoce.
   String get label {
     final item = itemName;
     final parts = [
@@ -70,8 +67,6 @@ class EvolutionNode {
       steps.map((s) => s.label).where((l) => l.isNotEmpty).toSet().join(' o ');
 }
 
-/// Árbol evolutivo de una especie. [currentSpeciesId] es la que se está
-/// mirando.
 class EvolutionChain {
   const EvolutionChain({required this.roots, required this.currentSpeciesId});
 
@@ -80,7 +75,6 @@ class EvolutionChain {
 
   bool get evolves => roots.any((root) => root.children.isNotEmpty);
 
-  /// Nodos en orden de lectura con su profundidad.
   List<(EvolutionNode, int)> get flattened => [
     for (final root in roots) ..._walk(root, 0),
   ];

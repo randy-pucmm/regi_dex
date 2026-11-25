@@ -8,8 +8,6 @@ import '../../../ui/tokens/contrast.dart';
 import '../../../ui/tokens/regi_colors.dart';
 import '../domain/pokemon_move.dart';
 
-/// Movimientos de un juego (grupo de versiones) por método, [movesPageSize]
-/// por página.
 class PokemonMovesSection extends ConsumerStatefulWidget {
   const PokemonMovesSection({super.key, required this.pokemonId});
 

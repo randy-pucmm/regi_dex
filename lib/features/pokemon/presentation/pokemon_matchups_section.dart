@@ -6,7 +6,6 @@ import '../../../ui/components/type_chip.dart';
 import '../../../ui/themes/regi_theme.dart';
 import '../domain/pokemon.dart';
 
-/// Daño que recibe el Pokémon de cada tipo, agrupado por multiplicador.
 class PokemonMatchupsSection extends ConsumerWidget {
   const PokemonMatchupsSection({super.key, required this.types});
 

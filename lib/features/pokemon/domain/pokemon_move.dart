@@ -12,7 +12,6 @@ enum MoveMethod {
   final String label;
 }
 
-/// Clase de daño de un movimiento (`move_damage_class` de PokéAPI).
 enum MoveCategory {
   status('Estado'),
   physical('Físico'),
@@ -31,7 +30,6 @@ enum MoveCategory {
   };
 }
 
-/// Movimientos que muestra cada página.
 const movesPageSize = 10;
 
 class PokemonMove {
@@ -60,7 +58,6 @@ class PokemonMove {
   final int level;
 }
 
-/// Una página de movimientos, contando desde 0, de [totalPages] páginas.
 class MovePage {
   const MovePage({
     required this.moves,
@@ -76,7 +73,6 @@ class MovePage {
   bool get hasNext => page + 1 < totalPages;
 }
 
-/// Un juego (grupo de versiones) en el que un Pokémon aprende movimientos.
 class MoveGame {
   const MoveGame({required this.id, this.name});
 
@@ -95,7 +91,6 @@ class MoveGame {
   }
 }
 
-/// Los juegos con movimientos de un Pokémon y el que se muestra al abrir.
 class MoveGames {
   const MoveGames({required this.games, this.defaultId});
 

@@ -1,7 +1,5 @@
 import 'pokemon.dart';
 
-/// Eficacia entre tipos (`type_efficacy`): cuánto daño hace cada tipo contra
-/// cada otro.
 class TypeChart {
   const TypeChart({required this.types, required this.percents});
 
@@ -16,8 +14,6 @@ class TypeChart {
 
   bool get isEmpty => types.isEmpty;
 
-  /// Multiplicador de [attackerId] contra un Pokémon de los tipos
-  /// [defenderIds].
   double multiplier(int attackerId, List<int> defenderIds) => defenderIds.fold(
     1.0,
     (total, defender) =>

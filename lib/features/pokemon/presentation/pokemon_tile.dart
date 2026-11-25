@@ -29,14 +29,15 @@ class PokemonTile extends StatelessWidget {
     final kinds = types.isEmpty
         ? ''
         : ', ${types.length == 1 ? 'tipo' : 'tipos'} ${types.join(' y ')}';
+    void open() => context.push(AppRoutes.pokemon(pokemon.id));
 
     return Semantics(
       label: '$name, número ${pokemon.id}$kinds',
       button: true,
       excludeSemantics: true,
-      onTap: () => context.push(AppRoutes.pokemon(pokemon.id)),
+      onTap: open,
       child: GestureDetector(
-        onTap: () => context.push(AppRoutes.pokemon(pokemon.id)),
+        onTap: open,
         child: DecoratedBox(
           decoration: const ShapeDecoration(
             color: RegiInk.shell,

@@ -9,8 +9,6 @@ import '../../../ui/components/pokemon_image.dart';
 import '../../../ui/themes/regi_theme.dart';
 import '../domain/evolution_chain.dart';
 
-/// Árbol evolutivo del Pokémon: cada especie con lo que hace falta para
-/// llegar a ella. Tocar una abre su detalle.
 class PokemonEvolutionsSection extends ConsumerWidget {
   const PokemonEvolutionsSection({super.key, required this.pokemonId});
 
