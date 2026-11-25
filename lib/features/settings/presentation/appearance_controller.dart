@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers.dart';
 import '../../../ui/themes/regi_themes.dart';
 import '../../../ui/tokens/regi_palette.dart';
 
@@ -26,15 +27,48 @@ class Appearance {
   int get hashCode => Object.hash(variant, mode);
 }
 
-// TODO(RD-34): guardarlo con `PreferenceDao` para que persista (RF-TEM-03).
+const themePreferenceKey = 'theme';
+const themeModePreferenceKey = 'theme_mode';
+
+/// Guarda el tema y el modo en `user_preference` y los restaura al abrir la
+/// app (RF-TEM-03).
 class AppearanceController extends Notifier<Appearance> {
+  var _touched = false;
+
   @override
-  Appearance build() => const Appearance();
+  Appearance build() {
+    _restore();
+    return const Appearance();
+  }
 
-  void selectVariant(RegiVariant variant) =>
-      state = state.copyWith(variant: variant);
+  Future<void> _restore() async {
+    final preferences = ref.read(appDatabaseProvider).preferenceDao;
+    final variant = await preferences.getValue(themePreferenceKey);
+    final mode = await preferences.getValue(themeModePreferenceKey);
+    if (_touched || !ref.mounted) return;
+    state = Appearance(
+      variant: RegiVariant.values.asNameMap()[variant] ?? state.variant,
+      mode: ThemeMode.values.asNameMap()[mode] ?? state.mode,
+    );
+  }
 
-  void selectMode(ThemeMode mode) => state = state.copyWith(mode: mode);
+  void selectVariant(RegiVariant variant) {
+    _touched = true;
+    state = state.copyWith(variant: variant);
+    ref
+        .read(appDatabaseProvider)
+        .preferenceDao
+        .setValue(themePreferenceKey, variant.name);
+  }
+
+  void selectMode(ThemeMode mode) {
+    _touched = true;
+    state = state.copyWith(mode: mode);
+    ref
+        .read(appDatabaseProvider)
+        .preferenceDao
+        .setValue(themeModePreferenceKey, mode.name);
+  }
 }
 
 final appearanceProvider = NotifierProvider<AppearanceController, Appearance>(

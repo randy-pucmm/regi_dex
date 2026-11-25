@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/favorites/presentation/favorites_page.dart';
 import '../features/pokemon/presentation/catalog_page.dart';
+import '../features/pokemon/presentation/pokemon_detail_page.dart';
 import '../features/team_builder/presentation/team_builder_page.dart';
 import '../features/trivia/presentation/trivia_page.dart';
 import 'app_shell.dart';
@@ -24,6 +25,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.catalog,
             builder: (context, state) => const CatalogPage(),
+          ),
+          GoRoute(
+            path: AppRoutes.pokemonPattern,
+            builder: (context, state) =>
+                PokemonDetailPage(id: int.parse(state.pathParameters['id']!)),
           ),
           GoRoute(
             path: AppRoutes.favorites,

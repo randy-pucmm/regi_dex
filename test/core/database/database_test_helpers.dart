@@ -251,3 +251,36 @@ Future<void> seedFilterCatalog(AppDatabase db) async {
   await add(377, 'regirock', 3, [6], [5], [5], 580);
   await add(378, 'regice', 3, [15], [5], [29], 580);
 }
+
+/// 32 movimientos de referencia (`move-1`…`move-32`), de tipo planta o veneno.
+Future<void> seedMoves(AppDatabase db) => db.referenceDao.upsertReferenceData(
+  versionGroups: [
+    for (final id in [10, 15, 20, 30])
+      VersionGroupsCompanion.insert(id: Value(id), name: 'group-$id'),
+  ],
+  moves: [
+    for (var id = 1; id <= 32; id++)
+      MovesCompanion.insert(
+        id: Value(id),
+        name: 'move-$id',
+        typeId: Value(id.isEven ? 12 : 4),
+        power: Value(40 + id),
+        accuracy: const Value(100),
+        pp: const Value(25),
+        damageClassId: Value(id % 3 + 1),
+      ),
+  ],
+);
+
+/// Lo que aprende Bulbasaur: `move-1`…`move-30` por nivel y `move-1`…`move-5`
+/// por MT en el grupo 20, y `move-31` y `move-32` por nivel solo en el grupo 10
+/// (más antiguo).
+List<({int moveId, int versionGroupId, int methodId, int level})>
+bulbasaurMoves() => [
+  for (var id = 1; id <= 30; id++)
+    (moveId: id, versionGroupId: 20, methodId: 1, level: id),
+  for (var id = 1; id <= 5; id++)
+    (moveId: id, versionGroupId: 20, methodId: 4, level: 0),
+  (moveId: 31, versionGroupId: 10, methodId: 1, level: 1),
+  (moveId: 32, versionGroupId: 10, methodId: 1, level: 2),
+];

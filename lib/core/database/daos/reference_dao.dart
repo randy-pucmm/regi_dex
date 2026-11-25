@@ -78,6 +78,12 @@ class ReferenceDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
+  Stream<List<TypeEfficacyRow>> watchEfficacies() =>
+      select(typeEfficacies).watch();
+
+  Future<List<TypeRow>> getTypes() =>
+      (select(types)..orderBy([(t) => OrderingTerm.asc(t.id)])).get();
+
   /// Tipos por id.
   Stream<List<TypeRow>> watchTypes() =>
       (select(types)..orderBy([(t) => OrderingTerm.asc(t.id)])).watch();

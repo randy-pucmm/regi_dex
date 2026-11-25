@@ -8,6 +8,34 @@ part 'catalog_dao.g.dart';
 /// Un Pokémon con sus tipos ya resueltos, por orden de slot.
 typedef PokemonWithTypes = ({PokemonRow pokemon, List<TypeRow> types});
 
+typedef PokemonDetailRows = ({
+  PokemonRow pokemon,
+  List<TypeRow> types,
+  List<PokemonStatRow> stats,
+  List<({AbilityRow ability, bool isHidden})> abilities,
+});
+
+/// Un movimiento que aprende un Pokémon, con los datos del movimiento.
+typedef PokemonMoveEntry = ({
+  int moveId,
+  String name,
+  String? typeName,
+  String? typeNameEs,
+  int? power,
+  int? accuracy,
+  int? pp,
+  int? damageClassId,
+  int level,
+});
+
+/// La cadena evolutiva de un Pokémon: sus pasos y, por especie, el nombre en
+/// español y el sprite del Pokémon por defecto.
+typedef EvolutionRows = ({
+  int currentSpeciesId,
+  List<EvolutionRow> steps,
+  Map<int, ({String? nameEs, String? spriteUrl})> species,
+});
+
 /// Campo por el que se ordena el catálogo.
 enum CatalogOrder { number, name, baseTotal }
 
@@ -321,6 +349,195 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       await (delete(evolutions)..where((t) => t.chainId.equals(chainId))).go();
       await batch((b) => b.insertAll(evolutions, rows));
     });
+  }
+
+  /// Un Pokémon con tipos, stats y habilidades; null si no existe. Vuelve a
+  /// emitir cuando cambia su fila, que es lo que toca [upsertPokemon].
+  Stream<PokemonDetailRows?> watchPokemonDetail(int id) {
+    final typeTable = attachedDatabase.types;
+    final abilityTable = attachedDatabase.abilities;
+    return (select(pokemons)..where((p) => p.id.equals(id)))
+        .watchSingleOrNull()
+        .asyncMap((pokemon) async {
+          if (pokemon == null) return null;
+          final types =
+              await (select(typeTable).join([
+                      innerJoin(
+                        pokemonTypes,
+                        pokemonTypes.typeId.equalsExp(typeTable.id),
+                      ),
+                    ])
+                    ..where(pokemonTypes.pokemonId.equals(id))
+                    ..orderBy([OrderingTerm.asc(pokemonTypes.slot)]))
+                  .map((row) => row.readTable(typeTable))
+                  .get();
+          final stats = await (select(
+            pokemonStats,
+          )..where((s) => s.pokemonId.equals(id))).get();
+          final abilities =
+              await (select(abilityTable).join([
+                      innerJoin(
+                        pokemonAbilities,
+                        pokemonAbilities.abilityId.equalsExp(abilityTable.id),
+                      ),
+                    ])
+                    ..where(pokemonAbilities.pokemonId.equals(id))
+                    ..orderBy([OrderingTerm.asc(pokemonAbilities.slot)]))
+                  .map(
+                    (row) => (
+                      ability: row.readTable(abilityTable),
+                      isHidden: row.read(pokemonAbilities.isHidden)!,
+                    ),
+                  )
+                  .get();
+          return (
+            pokemon: pokemon,
+            types: types,
+            stats: stats,
+            abilities: abilities,
+          );
+        });
+  }
+
+  /// La cadena evolutiva de [pokemonId]; null si no está o no se descargó.
+  Stream<EvolutionRows?> watchEvolutions(int pokemonId) =>
+      select(evolutions).watch().asyncMap((_) => _evolutionRows(pokemonId));
+
+  Future<EvolutionRows?> _evolutionRows(int pokemonId) async {
+    final pokemon = await getPokemon(pokemonId);
+    if (pokemon == null) return null;
+    final current = await (select(
+      species,
+    )..where((s) => s.id.equals(pokemon.speciesId))).getSingleOrNull();
+    final chainId = current?.evolutionChainId;
+    if (chainId == null) return null;
+
+    final steps =
+        await (select(evolutions)
+              ..where((e) => e.chainId.equals(chainId))
+              ..orderBy([(e) => OrderingTerm.asc(e.id)]))
+            .get();
+    if (steps.isEmpty) return null;
+    final ids = {for (final e in steps) e.toSpeciesId};
+    final names = await (select(species)..where((s) => s.id.isIn(ids))).get();
+    final defaults = await (select(
+      pokemons,
+    )..where((p) => p.speciesId.isIn(ids) & p.isDefault.equals(true))).get();
+    final nameEs = {for (final n in names) n.id: n.nameEs};
+    final sprites = {for (final p in defaults) p.speciesId: p.spriteUrl};
+    return (
+      currentSpeciesId: pokemon.speciesId,
+      steps: steps,
+      species: {
+        for (final id in ids) id: (nameEs: nameEs[id], spriteUrl: sprites[id]),
+      },
+    );
+  }
+
+  /// Condición de las filas de [pokemonId] en [versionGroupId], de
+  /// [methodId] o de cualquier método si es null.
+  Expression<bool> _learned(int pokemonId, int versionGroupId, int? methodId) =>
+      pokemonMoves.pokemonId.equals(pokemonId) &
+      pokemonMoves.versionGroupId.equals(versionGroupId) &
+      (methodId == null
+          ? const Constant(true)
+          : pokemonMoves.learnMethodId.equals(methodId));
+
+  /// Juegos (grupos de versiones) en los que [pokemonId] aprende movimientos,
+  /// del más reciente al más antiguo, con su nombre.
+  Future<List<({int id, String name})>> getMoveGames(int pokemonId) async {
+    final versionGroups = attachedDatabase.versionGroups;
+    final query =
+        selectOnly(pokemonMoves).join([
+            innerJoin(
+              versionGroups,
+              versionGroups.id.equalsExp(pokemonMoves.versionGroupId),
+            ),
+          ])
+          ..addColumns([pokemonMoves.versionGroupId, versionGroups.name])
+          ..where(pokemonMoves.pokemonId.equals(pokemonId))
+          ..groupBy([pokemonMoves.versionGroupId])
+          ..orderBy([OrderingTerm.desc(pokemonMoves.versionGroupId)]);
+    return query
+        .map(
+          (row) => (
+            id: row.read(pokemonMoves.versionGroupId)!,
+            name: row.read(versionGroups.name)!,
+          ),
+        )
+        .get();
+  }
+
+  /// El juego más reciente donde [pokemonId] aprende movimientos por nivel;
+  /// si no hay, el más reciente con datos. Null si no tiene movimientos.
+  Future<int?> getDefaultMoveGame(int pokemonId) async {
+    final latest = pokemonMoves.versionGroupId.max();
+    Future<int?> latestWhere(Expression<bool> condition) =>
+        (selectOnly(pokemonMoves)
+              ..addColumns([latest])
+              ..where(condition))
+            .map((row) => row.read(latest))
+            .getSingle();
+
+    final ofPokemon = pokemonMoves.pokemonId.equals(pokemonId);
+    return await latestWhere(
+          ofPokemon & pokemonMoves.learnMethodId.equals(1),
+        ) ??
+        await latestWhere(ofPokemon);
+  }
+
+  Future<int> countMoves(
+    int pokemonId, {
+    required int versionGroupId,
+    int? methodId,
+  }) {
+    final count = pokemonMoves.moveId.count(distinct: true);
+    return (selectOnly(pokemonMoves)
+          ..addColumns([count])
+          ..where(_learned(pokemonId, versionGroupId, methodId)))
+        .map((row) => row.read(count)!)
+        .getSingle();
+  }
+
+  /// Movimientos de [pokemonId] en [versionGroupId] por [methodId] (todos si
+  /// es null, cada uno una vez y por nombre; si no, por nivel y nombre).
+  /// [limit] y [offset] paginan en la consulta.
+  Future<List<PokemonMoveEntry>> getMoves(
+    int pokemonId, {
+    required int versionGroupId,
+    required int? methodId,
+    required int limit,
+    int offset = 0,
+  }) async {
+    final moveTable = attachedDatabase.moves;
+    final typeTable = attachedDatabase.types;
+    final query =
+        select(pokemonMoves).join([
+            innerJoin(moveTable, moveTable.id.equalsExp(pokemonMoves.moveId)),
+            leftOuterJoin(typeTable, typeTable.id.equalsExp(moveTable.typeId)),
+          ])
+          ..where(_learned(pokemonId, versionGroupId, methodId))
+          ..orderBy([
+            if (methodId != null) OrderingTerm.asc(pokemonMoves.level),
+            OrderingTerm.asc(moveTable.name),
+          ])
+          ..limit(limit, offset: offset);
+    if (methodId == null) query.groupBy([pokemonMoves.moveId]);
+    return query.map((row) {
+      final move = row.readTable(moveTable);
+      final type = row.readTableOrNull(typeTable);
+      return (
+        moveId: move.id,
+        name: move.name,
+        typeName: type?.name,
+        typeNameEs: type?.nameEs,
+        power: move.power,
+        accuracy: move.accuracy,
+        pp: move.pp,
+        damageClassId: move.damageClassId,
+        level: row.read(pokemonMoves.level)!,
+      );
+    }).get();
   }
 
   /// Inserta o actualiza [pokemon] y reemplaza sus tipos, stats y habilidades

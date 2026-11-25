@@ -8,6 +8,7 @@ import '../core/connectivity/health_checker.dart';
 import '../core/connectivity/network_source.dart';
 import '../core/connectivity/service_status.dart';
 import '../core/database/app_database.dart';
+import '../core/error/failure.dart';
 import '../core/network/operation_loader.dart';
 import '../core/network/poke_api_client.dart';
 import '../core/network/poke_api_config.dart';
@@ -17,13 +18,19 @@ import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/detail_sync.dart';
+import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
 import '../features/pokemon/data/remote_search.dart';
+import '../features/pokemon/domain/evolution_chain.dart';
+import '../features/pokemon/domain/pokemon_detail.dart';
+import '../features/pokemon/domain/pokemon_detail_repository.dart';
+import '../features/pokemon/domain/pokemon_move.dart';
 import '../features/pokemon/domain/pokemon_repository.dart';
 import '../features/pokemon/domain/refresh_catalog.dart';
 import '../features/pokemon/domain/search_pokemon_remote.dart';
 import '../features/pokemon/domain/sync_pokemon_detail.dart';
+import '../features/pokemon/domain/type_chart.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
@@ -176,4 +183,59 @@ final searchPokemonRemoteProvider = Provider<SearchPokemonRemote>(
 /// Caso de uso: traer el detalle de un Pokémon al abrirlo.
 final syncPokemonDetailProvider = Provider<SyncPokemonDetail>(
   (ref) => SyncPokemonDetail(ref.watch(pokemonRepositoryProvider)),
+);
+
+final pokemonDetailRepositoryProvider = Provider<PokemonDetailRepository>(
+  (ref) => PokemonDetailRepositoryImpl(
+    catalog: ref.watch(appDatabaseProvider).catalogDao,
+    reference: ref.watch(appDatabaseProvider).referenceDao,
+  ),
+);
+
+final pokemonDetailProvider = StreamProvider.family<PokemonDetail?, int>(
+  (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchDetail(id),
+);
+
+final pokemonEvolutionsProvider = StreamProvider.family<EvolutionChain?, int>(
+  (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchEvolutions(id),
+);
+
+final typeChartProvider = StreamProvider<TypeChart>(
+  (ref) => ref.watch(pokemonDetailRepositoryProvider).watchTypeChart(),
+);
+
+typedef MovesRequest = ({
+  int pokemonId,
+  MoveMethod method,
+  int versionGroupId,
+  int page,
+});
+
+/// Se vuelve a leer cuando termina la descarga del detalle.
+final pokemonMoveGamesProvider = FutureProvider.family<MoveGames, int>((
+  ref,
+  pokemonId,
+) {
+  ref.watch(pokemonDetailRefreshProvider(pokemonId));
+  return ref.watch(pokemonDetailRepositoryProvider).moveGames(pokemonId);
+});
+
+final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>(
+  (ref, request) => ref
+      .watch(pokemonDetailRepositoryProvider)
+      .moves(
+        request.pokemonId,
+        request.method,
+        versionGroupId: request.versionGroupId,
+        page: request.page,
+      ),
+);
+
+/// Descarga el detalle al abrir un Pokémon. Devuelve false si no se pudo: la
+/// pantalla sigue con lo local.
+final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>(
+  (ref, id) => ref
+      .watch(syncPokemonDetailProvider)(id)
+      .then((_) => true)
+      .onError<Failure>((_, _) => false),
 );
