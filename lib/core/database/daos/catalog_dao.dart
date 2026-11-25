@@ -8,6 +8,13 @@ part 'catalog_dao.g.dart';
 /// Un Pokémon con sus tipos ya resueltos, por orden de slot.
 typedef PokemonWithTypes = ({PokemonRow pokemon, List<TypeRow> types});
 
+typedef PokemonDetailRows = ({
+  PokemonRow pokemon,
+  List<TypeRow> types,
+  List<PokemonStatRow> stats,
+  List<({AbilityRow ability, bool isHidden})> abilities,
+});
+
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
 @DriftAccessor(
   tables: [
@@ -57,6 +64,54 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       }
       return result;
     });
+  }
+
+  /// Un Pokémon con tipos, stats y habilidades; null si no existe. Vuelve a
+  /// emitir cuando cambia su fila, que es lo que toca [upsertPokemon].
+  Stream<PokemonDetailRows?> watchPokemonDetail(int id) {
+    final typeTable = attachedDatabase.types;
+    final abilityTable = attachedDatabase.abilities;
+    return (select(pokemons)..where((p) => p.id.equals(id)))
+        .watchSingleOrNull()
+        .asyncMap((pokemon) async {
+          if (pokemon == null) return null;
+          final types =
+              await (select(typeTable).join([
+                      innerJoin(
+                        pokemonTypes,
+                        pokemonTypes.typeId.equalsExp(typeTable.id),
+                      ),
+                    ])
+                    ..where(pokemonTypes.pokemonId.equals(id))
+                    ..orderBy([OrderingTerm.asc(pokemonTypes.slot)]))
+                  .map((row) => row.readTable(typeTable))
+                  .get();
+          final stats = await (select(
+            pokemonStats,
+          )..where((s) => s.pokemonId.equals(id))).get();
+          final abilities =
+              await (select(abilityTable).join([
+                      innerJoin(
+                        pokemonAbilities,
+                        pokemonAbilities.abilityId.equalsExp(abilityTable.id),
+                      ),
+                    ])
+                    ..where(pokemonAbilities.pokemonId.equals(id))
+                    ..orderBy([OrderingTerm.asc(pokemonAbilities.slot)]))
+                  .map(
+                    (row) => (
+                      ability: row.readTable(abilityTable),
+                      isHidden: row.read(pokemonAbilities.isHidden)!,
+                    ),
+                  )
+                  .get();
+          return (
+            pokemon: pokemon,
+            types: types,
+            stats: stats,
+            abilities: abilities,
+          );
+        });
   }
 
   /// Cantidad de Pokémon del catálogo, como flujo.

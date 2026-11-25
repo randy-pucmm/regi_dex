@@ -17,7 +17,10 @@ import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
+import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
+import '../features/pokemon/domain/pokemon_detail.dart';
+import '../features/pokemon/domain/pokemon_detail_repository.dart';
 import '../features/pokemon/domain/pokemon_repository.dart';
 import '../features/pokemon/domain/refresh_catalog.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
@@ -131,6 +134,17 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>(
     coordinator: ref.watch(syncCoordinatorProvider),
     sync: ref.watch(catalogSyncProvider),
   ),
+);
+
+/// Detalle de un Pokémon desde la base local.
+final pokemonDetailRepositoryProvider = Provider<PokemonDetailRepository>(
+  (ref) => PokemonDetailRepositoryImpl(
+    catalog: ref.watch(appDatabaseProvider).catalogDao,
+  ),
+);
+
+final pokemonDetailProvider = StreamProvider.family<PokemonDetail?, int>(
+  (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchDetail(id),
 );
 
 /// Caso de uso: observar el catálogo.

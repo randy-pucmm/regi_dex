@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/routes.dart';
 import '../../../ui/components/hexagon_border.dart';
 import '../../../ui/components/pokemon_image.dart';
 import '../../../ui/components/type_chip.dart';
@@ -30,68 +32,73 @@ class PokemonTile extends StatelessWidget {
 
     return Semantics(
       label: '$name, número ${pokemon.id}$kinds',
+      button: true,
       excludeSemantics: true,
-      child: DecoratedBox(
-        decoration: const ShapeDecoration(
-          color: RegiInk.shell,
-          shape: HexagonBorder(
-            pointAxis: Axis.horizontal,
-            depth: _depth,
-            side: BorderSide(color: RegiInk.onShellMuted, width: 1.5),
+      onTap: () => context.push(AppRoutes.pokemon(pokemon.id)),
+      child: GestureDetector(
+        onTap: () => context.push(AppRoutes.pokemon(pokemon.id)),
+        child: DecoratedBox(
+          decoration: const ShapeDecoration(
+            color: RegiInk.shell,
+            shape: HexagonBorder(
+              pointAxis: Axis.horizontal,
+              depth: _depth,
+              side: BorderSide(color: RegiInk.onShellMuted, width: 1.5),
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(_depth + 4, 8, _depth + 4, 8),
-          child: Row(
-            spacing: 12,
-            children: [
-              PokemonImage(
-                url: pokemon.spriteUrl,
-                size: 56,
-                cacheManager: cacheManager,
-                plateColor: pokemon.types.isEmpty
-                    ? null
-                    : RegiTypeColors.of(pokemon.types.first.name),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 4,
-                  children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.end,
-                      spacing: 8,
-                      children: [
-                        Text(
-                          name,
-                          style: text.titleMedium?.copyWith(
-                            color: RegiInk.onShell,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'N.º ${pokemon.id.toString().padLeft(4, '0')}',
-                          style: text.labelSmall?.copyWith(
-                            color: RegiInk.onShellMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        for (final type in pokemon.types)
-                          TypeChip(
-                            typeKey: type.name,
-                            label: type.nameEs ?? type.name,
-                          ),
-                      ],
-                    ),
-                  ],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(_depth + 4, 8, _depth + 4, 8),
+            child: Row(
+              spacing: 12,
+              children: [
+                PokemonImage(
+                  url: pokemon.spriteUrl,
+                  size: 56,
+                  cacheManager: cacheManager,
+                  plateColor: pokemon.types.isEmpty
+                      ? null
+                      : RegiTypeColors.of(pokemon.types.first.name),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 4,
+                    children: [
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.end,
+                        spacing: 8,
+                        children: [
+                          Text(
+                            name,
+                            style: text.titleMedium?.copyWith(
+                              color: RegiInk.onShell,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            'N.º ${pokemon.id.toString().padLeft(4, '0')}',
+                            style: text.labelSmall?.copyWith(
+                              color: RegiInk.onShellMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          for (final type in pokemon.types)
+                            TypeChip(
+                              typeKey: type.name,
+                              label: type.nameEs ?? type.name,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

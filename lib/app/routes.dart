@@ -6,4 +6,7 @@ abstract final class AppRoutes {
   static const favorites = '/favorites';
   static const teamBuilder = '/team-builder';
   static const trivia = '/trivia';
+
+  static const pokemonPattern = '/pokemon/:id';
+  static String pokemon(int id) => '/pokemon/$id';
 }
