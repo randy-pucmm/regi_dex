@@ -20,9 +20,11 @@ import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
+import '../features/pokemon/domain/evolution_chain.dart';
 import '../features/pokemon/domain/pokemon_detail.dart';
 import '../features/pokemon/domain/pokemon_detail_repository.dart';
 import '../features/pokemon/domain/pokemon_move.dart';
+import '../features/pokemon/domain/type_chart.dart';
 import '../features/pokemon/domain/pokemon_repository.dart';
 import '../features/pokemon/domain/refresh_catalog.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
@@ -142,6 +144,7 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>(
 final pokemonDetailRepositoryProvider = Provider<PokemonDetailRepository>(
   (ref) => PokemonDetailRepositoryImpl(
     catalog: ref.watch(appDatabaseProvider).catalogDao,
+    reference: ref.watch(appDatabaseProvider).referenceDao,
     remote: ref.watch(pokemonRemoteSourceProvider),
   ),
 );
@@ -150,19 +153,44 @@ final pokemonDetailProvider = StreamProvider.family<PokemonDetail?, int>(
   (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchDetail(id),
 );
 
-typedef MovesRequest = ({int pokemonId, MoveMethod method, int page});
+/// Cadena evolutiva de un Pokémon; null si aún no se descargó.
+final pokemonEvolutionsProvider = StreamProvider.family<EvolutionChain?, int>(
+  (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchEvolutions(id),
+);
 
-/// Una página de movimientos de un Pokémon por método. Se
-/// vuelve a leer cuando termina la descarga del detalle.
-final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>((
-  ref,
-  request,
-) {
-  ref.watch(pokemonDetailRefreshProvider(request.pokemonId));
-  return ref
-      .watch(pokemonDetailRepositoryProvider)
-      .moves(request.pokemonId, request.method, page: request.page);
+/// Eficacia entre tipos para calcular debilidades.
+final typeChartProvider = StreamProvider<TypeChart>(
+  (ref) => ref.watch(pokemonDetailRepositoryProvider).watchTypeChart(),
+);
+
+typedef MovesRequest = ({
+  int pokemonId,
+  MoveMethod method,
+  int versionGroupId,
+  int page,
 });
+
+/// Juegos con movimientos de un Pokémon. Se vuelve a leer cuando termina la
+/// descarga del detalle.
+final pokemonMoveGamesProvider = FutureProvider.family<MoveGames, int>((
+  ref,
+  pokemonId,
+) {
+  ref.watch(pokemonDetailRefreshProvider(pokemonId));
+  return ref.watch(pokemonDetailRepositoryProvider).moveGames(pokemonId);
+});
+
+/// Una página de movimientos de un Pokémon por método y juego.
+final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>(
+  (ref, request) => ref
+      .watch(pokemonDetailRepositoryProvider)
+      .moves(
+        request.pokemonId,
+        request.method,
+        versionGroupId: request.versionGroupId,
+        page: request.page,
+      ),
+);
 
 /// Descarga el detalle al abrir un Pokémon. Devuelve false si no se pudo: la
 /// pantalla sigue con lo local.

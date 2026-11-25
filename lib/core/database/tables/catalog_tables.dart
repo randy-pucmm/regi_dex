@@ -129,3 +129,24 @@ class PokemonMoves extends Table {
     level,
   };
 }
+
+/// Cómo evoluciona una especie desde otra. Una especie puede tener varias
+/// filas (una por condición alternativa); las condiciones vacías van en null.
+/// `speciesId` no es FK: el detalle puede llegar antes que toda la cadena.
+@DataClassName('SpeciesEvolutionRow')
+class SpeciesEvolutions extends Table {
+  @override
+  String get tableName => 'species_evolution';
+
+  IntColumn get speciesId => integer()();
+  IntColumn get ordinal => integer()();
+  IntColumn get evolvesFromSpeciesId => integer()();
+  TextColumn get trigger => text().nullable()();
+  IntColumn get minLevel => integer().nullable()();
+  IntColumn get minHappiness => integer().nullable()();
+  TextColumn get timeOfDay => text().nullable()();
+  TextColumn get itemName => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {speciesId, ordinal};
+}

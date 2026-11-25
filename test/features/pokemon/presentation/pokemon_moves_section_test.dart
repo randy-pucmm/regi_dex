@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_move.dart';
@@ -9,33 +10,45 @@ import '../../../helpers/ui_test_helpers.dart';
 
 const _total = 25;
 
+const _games = MoveGames(
+  games: [
+    MoveGame(id: 20, name: 'sword-shield'),
+    MoveGame(id: 10, name: 'heartgold-soulsilver'),
+  ],
+  defaultId: 20,
+);
+
+List<Override> _overrides(List<MovesRequest> requests, {bool? downloaded}) => [
+  pokemonDetailRefreshProvider(1).overrideWith((ref) => downloaded ?? true),
+  pokemonMoveGamesProvider(1).overrideWith((ref) => _games),
+  pokemonMovesProvider.overrideWith((ref, request) async {
+    requests.add(request);
+    final all = [
+      for (var i = 1; i <= _total; i++)
+        PokemonMove(
+          id: i,
+          name: 'move-$i',
+          level: i,
+          category: MoveCategory.values[i % 3],
+        ),
+    ];
+    return MovePage(
+      moves: all
+          .skip(request.page * movesPageSize)
+          .take(movesPageSize)
+          .toList(),
+      page: request.page,
+      totalPages: (_total / movesPageSize).ceil(),
+    );
+  }),
+];
+
 Future<List<MovesRequest>> _open(WidgetTester tester) async {
   useScreen(tester, const Size(390, 2000));
   final requests = <MovesRequest>[];
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [
-        pokemonMovesProvider.overrideWith((ref, request) async {
-          requests.add(request);
-          final all = [
-            for (var i = 1; i <= _total; i++)
-              PokemonMove(
-                id: i,
-                name: 'move-$i',
-                level: i,
-                category: MoveCategory.values[i % 3],
-              ),
-          ];
-          return MovePage(
-            moves: all
-                .skip(request.page * movesPageSize)
-                .take(movesPageSize)
-                .toList(),
-            page: request.page,
-            totalPages: (_total / movesPageSize).ceil(),
-          );
-        }),
-      ],
+      overrides: _overrides(requests),
       child: regiHost(
         const SingleChildScrollView(child: PokemonMovesSection(pokemonId: 1)),
       ),
@@ -51,11 +64,31 @@ Future<void> _tap(WidgetTester tester, String tooltip) async {
 }
 
 void main() {
-  testWidgets('muestra 10 movimientos y la página 1 de 3', (tester) async {
-    await _open(tester);
+  testWidgets('abre en el juego por defecto con 10 movimientos', (
+    tester,
+  ) async {
+    final requests = await _open(tester);
 
+    expect(requests.last.versionGroupId, 20);
+    expect(find.text('Sword Shield'), findsOneWidget);
     expect(find.text('Move 10'), findsOneWidget);
     expect(find.text('Move 11'), findsNothing);
+    expect(find.text('Página 1 de 3'), findsOneWidget);
+  });
+
+  testWidgets('cambiar de juego pide ese juego desde la primera página', (
+    tester,
+  ) async {
+    final requests = await _open(tester);
+    await _tap(tester, 'Página siguiente');
+
+    await tester.tap(find.text('Sword Shield'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Heartgold Soulsilver').last);
+    await tester.pumpAndSettle();
+
+    expect(requests.last.versionGroupId, 10);
+    expect(requests.last.page, 0);
     expect(find.text('Página 1 de 3'), findsOneWidget);
   });
 
@@ -75,22 +108,20 @@ void main() {
     tester,
   ) async {
     await _open(tester);
-    IconButton button(String tooltip) => tester.widget(
-      find.widgetWithIcon(
-        IconButton,
-        tooltip == 'prev' ? Icons.chevron_left : Icons.chevron_right,
-      ),
-    );
+    IconButton button(IconData icon) =>
+        tester.widget(find.widgetWithIcon(IconButton, icon));
 
-    expect(button('prev').onPressed, isNull);
+    expect(button(Icons.chevron_left).onPressed, isNull);
     await _tap(tester, 'Página siguiente');
     await _tap(tester, 'Página siguiente');
     expect(find.text('Página 3 de 3'), findsOneWidget);
     expect(find.text('Move 25'), findsOneWidget);
-    expect(button('next').onPressed, isNull);
+    expect(button(Icons.chevron_right).onPressed, isNull);
   });
 
-  testWidgets('cambiar de método vuelve a la primera página', (tester) async {
+  testWidgets('cambiar de método conserva el juego y vuelve a la página 1', (
+    tester,
+  ) async {
     final requests = await _open(tester);
 
     await _tap(tester, 'Página siguiente');
@@ -98,6 +129,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(requests.last.method, MoveMethod.machine);
+    expect(requests.last.versionGroupId, 20);
     expect(requests.last.page, 0);
     expect(find.text('Página 1 de 3'), findsOneWidget);
   });
@@ -113,7 +145,7 @@ void main() {
     expect(find.byTooltip('Especial'), findsWidgets);
   });
 
-  testWidgets('sin movimientos y sin poder descargar avisa de la conexión', (
+  testWidgets('sin juegos y sin poder descargar avisa de la conexión', (
     tester,
   ) async {
     useScreen(tester, const Size(390, 900));
@@ -121,9 +153,8 @@ void main() {
       ProviderScope(
         overrides: [
           pokemonDetailRefreshProvider(1).overrideWith((ref) => false),
-          pokemonMovesProvider.overrideWith(
-            (ref, request) => const MovePage(moves: [], page: 0, totalPages: 0),
-          ),
+          pokemonMoveGamesProvider(1)
+              .overrideWith((ref) => const MoveGames.empty()),
         ],
         child: regiHost(const PokemonMovesSection(pokemonId: 1)),
       ),

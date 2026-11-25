@@ -28,6 +28,14 @@ typedef PokemonMoveEntry = ({
   int level,
 });
 
+/// La cadena evolutiva de un Pokémon: sus especies con el sprite del Pokémon
+/// por defecto y las condiciones de cada evolución.
+typedef EvolutionRows = ({
+  int currentSpeciesId,
+  List<({SpeciesRow species, String? spriteUrl})> members,
+  List<SpeciesEvolutionRow> evolutions,
+});
+
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
 @DriftAccessor(
   tables: [
@@ -38,6 +46,7 @@ typedef PokemonMoveEntry = ({
     PokemonStats,
     PokemonAbilities,
     PokemonMoves,
+    SpeciesEvolutions,
   ],
 )
 class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
@@ -137,6 +146,21 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     required List<({int id, String? nameEs, String? shortEffect})> abilities,
     required List<({int moveId, int versionGroupId, int methodId, int level})>
     moves,
+    List<int> chainSpeciesIds = const [],
+    List<
+          ({
+            int speciesId,
+            int fromSpeciesId,
+            int ordinal,
+            String? trigger,
+            int? minLevel,
+            int? minHappiness,
+            String? timeOfDay,
+            String? itemName,
+          })
+        >
+        evolutions =
+        const [],
     String? speciesNameEs,
     String? genusEs,
   }) => transaction(() async {
@@ -164,6 +188,26 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
           ),
       ], mode: InsertMode.insertOrIgnore),
     );
+    if (chainSpeciesIds.isNotEmpty) {
+      await (delete(
+        speciesEvolutions,
+      )..where((e) => e.speciesId.isIn(chainSpeciesIds))).go();
+      await batch(
+        (b) => b.insertAll(speciesEvolutions, [
+          for (final e in evolutions)
+            SpeciesEvolutionsCompanion.insert(
+              speciesId: e.speciesId,
+              ordinal: e.ordinal,
+              evolvesFromSpeciesId: e.fromSpeciesId,
+              trigger: Value(e.trigger),
+              minLevel: Value(e.minLevel),
+              minHappiness: Value(e.minHappiness),
+              timeOfDay: Value(e.timeOfDay),
+              itemName: Value(e.itemName),
+            ),
+        ]),
+      );
+    }
     await (update(species)..where((s) => s.id.equals(speciesId))).write(
       SpeciesCompanion(nameEs: Value(speciesNameEs), genusEs: Value(genusEs)),
     );
@@ -171,6 +215,49 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       PokemonsCompanion(detailSyncedAt: Value(syncedAt)),
     );
   });
+
+  /// La cadena evolutiva de [pokemonId]; null si no está o no sabe su cadena.
+  /// Vuelve a emitir cuando se guardan evoluciones.
+  Stream<EvolutionRows?> watchEvolutions(int pokemonId) =>
+      select(speciesEvolutions)
+          .watch()
+          .asyncMap((_) => _evolutionRows(pokemonId));
+
+  Future<EvolutionRows?> _evolutionRows(int pokemonId) async {
+    final pokemon = await getPokemon(pokemonId);
+    if (pokemon == null) return null;
+    final current = await (select(
+      species,
+    )..where((s) => s.id.equals(pokemon.speciesId))).getSingleOrNull();
+    final chainId = current?.evolutionChainId;
+    if (chainId == null) return null;
+
+    final members =
+        await (select(species)
+              ..where((s) => s.evolutionChainId.equals(chainId))
+              ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+            .get();
+    final ids = [for (final m in members) m.id];
+    final defaults = await (select(
+      pokemons,
+    )..where((p) => p.speciesId.isIn(ids) & p.isDefault.equals(true))).get();
+    final sprites = {for (final p in defaults) p.speciesId: p.spriteUrl};
+    final evolutions =
+        await (select(speciesEvolutions)
+              ..where((e) => e.speciesId.isIn(ids))
+              ..orderBy([
+                (e) => OrderingTerm.asc(e.speciesId),
+                (e) => OrderingTerm.asc(e.ordinal),
+              ]))
+            .get();
+    return (
+      currentSpeciesId: pokemon.speciesId,
+      members: [
+        for (final m in members) (species: m, spriteUrl: sprites[m.id]),
+      ],
+      evolutions: evolutions,
+    );
+  }
 
   /// Indica si hay algún movimiento guardado de [pokemonId].
   Future<bool> hasMoves(int pokemonId) async =>
@@ -180,50 +267,81 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
               .get())
           .isNotEmpty;
 
-  /// Condición de las filas de [pokemonId] que se muestran para [methodId]:
-  /// las del juego más reciente donde lo aprende por ese método (los métodos
-  /// no coinciden entre juegos), o todas si es null. Null si no aprende nada
-  /// por ese método.
-  Future<Expression<bool>?> _learned(int pokemonId, int? methodId) async {
-    final ofPokemon = pokemonMoves.pokemonId.equals(pokemonId);
-    if (methodId == null) return ofPokemon;
-    final byMethod = ofPokemon & pokemonMoves.methodId.equals(methodId);
-    final latest = pokemonMoves.versionGroupId.max();
-    final versionGroup =
-        await (selectOnly(pokemonMoves)
-              ..addColumns([latest])
-              ..where(byMethod))
-            .map((row) => row.read(latest))
-            .getSingle();
-    if (versionGroup == null) return null;
-    return byMethod & pokemonMoves.versionGroupId.equals(versionGroup);
+  /// Condición de las filas de [pokemonId] en [versionGroupId], de
+  /// [methodId] o de cualquier método si es null.
+  Expression<bool> _learned(int pokemonId, int versionGroupId, int? methodId) =>
+      pokemonMoves.pokemonId.equals(pokemonId) &
+      pokemonMoves.versionGroupId.equals(versionGroupId) &
+      (methodId == null
+          ? const Constant(true)
+          : pokemonMoves.methodId.equals(methodId));
+
+  /// Juegos (grupos de versiones) en los que [pokemonId] aprende movimientos,
+  /// del más reciente al más antiguo, con su nombre si la referencia lo tiene.
+  Future<List<({int id, String? name})>> getMoveGames(int pokemonId) async {
+    final versionGroups = attachedDatabase.versionGroups;
+    final query =
+        selectOnly(pokemonMoves).join([
+            leftOuterJoin(
+              versionGroups,
+              versionGroups.id.equalsExp(pokemonMoves.versionGroupId),
+            ),
+          ])
+          ..addColumns([pokemonMoves.versionGroupId, versionGroups.name])
+          ..where(pokemonMoves.pokemonId.equals(pokemonId))
+          ..groupBy([pokemonMoves.versionGroupId])
+          ..orderBy([OrderingTerm.desc(pokemonMoves.versionGroupId)]);
+    return query
+        .map(
+          (row) => (
+            id: row.read(pokemonMoves.versionGroupId)!,
+            name: row.read(versionGroups.name),
+          ),
+        )
+        .get();
   }
 
-  /// Cantidad de movimientos distintos de [pokemonId] que muestra
-  /// [getMoves] para [methodId].
-  Future<int> countMoves(int pokemonId, {int? methodId}) async {
-    final condition = await _learned(pokemonId, methodId);
-    if (condition == null) return 0;
+  /// El juego más reciente donde [pokemonId] aprende movimientos por nivel;
+  /// si no hay, el más reciente con datos. Null si no tiene movimientos.
+  Future<int?> getDefaultMoveGame(int pokemonId) async {
+    final latest = pokemonMoves.versionGroupId.max();
+    Future<int?> latestWhere(Expression<bool> condition) =>
+        (selectOnly(pokemonMoves)
+              ..addColumns([latest])
+              ..where(condition))
+            .map((row) => row.read(latest))
+            .getSingle();
+
+    final ofPokemon = pokemonMoves.pokemonId.equals(pokemonId);
+    return await latestWhere(ofPokemon & pokemonMoves.methodId.equals(1)) ??
+        await latestWhere(ofPokemon);
+  }
+
+  /// Cantidad de movimientos distintos de [pokemonId] en [versionGroupId] que
+  /// muestra [getMoves] para [methodId].
+  Future<int> countMoves(
+    int pokemonId, {
+    required int versionGroupId,
+    int? methodId,
+  }) {
     final count = pokemonMoves.moveId.count(distinct: true);
     return (selectOnly(pokemonMoves)
           ..addColumns([count])
-          ..where(condition))
+          ..where(_learned(pokemonId, versionGroupId, methodId)))
         .map((row) => row.read(count)!)
         .getSingle();
   }
 
-  /// Movimientos de [pokemonId] por [methodId] (todos si es null, cada uno
-  /// una vez y por nombre; si no, por nivel y nombre). [limit] y [offset]
-  /// paginan en la consulta.
+  /// Movimientos de [pokemonId] en [versionGroupId] por [methodId] (todos si
+  /// es null, cada uno una vez y por nombre; si no, por nivel y nombre).
+  /// [limit] y [offset] paginan en la consulta.
   Future<List<PokemonMoveEntry>> getMoves(
     int pokemonId, {
+    required int versionGroupId,
     required int? methodId,
     required int limit,
     int offset = 0,
   }) async {
-    final condition = await _learned(pokemonId, methodId);
-    if (condition == null) return const [];
-
     final moveTable = attachedDatabase.moves;
     final typeTable = attachedDatabase.types;
     final query =
@@ -231,7 +349,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
             innerJoin(moveTable, moveTable.id.equalsExp(pokemonMoves.moveId)),
             leftOuterJoin(typeTable, typeTable.id.equalsExp(moveTable.typeId)),
           ])
-          ..where(condition)
+          ..where(_learned(pokemonId, versionGroupId, methodId))
           ..orderBy([
             if (methodId != null) OrderingTerm.asc(pokemonMoves.level),
             OrderingTerm.asc(moveTable.name),

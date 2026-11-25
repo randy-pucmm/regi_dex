@@ -75,3 +75,32 @@ class MovePage {
   bool get hasPrevious => page > 0;
   bool get hasNext => page + 1 < totalPages;
 }
+
+/// Un juego (grupo de versiones) en el que un Pokémon aprende movimientos.
+class MoveGame {
+  const MoveGame({required this.id, this.name});
+
+  final int id;
+
+  /// Nombre de PokéAPI (`red-blue`), si la referencia ya lo tiene.
+  final String? name;
+
+  String get label {
+    final raw = name;
+    if (raw == null || raw.isEmpty) return 'Juego $id';
+    return raw
+        .split('-')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+}
+
+/// Los juegos con movimientos de un Pokémon y el que se muestra al abrir.
+class MoveGames {
+  const MoveGames({required this.games, this.defaultId});
+
+  const MoveGames.empty() : games = const [], defaultId = null;
+
+  final List<MoveGame> games;
+  final int? defaultId;
+}

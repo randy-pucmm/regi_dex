@@ -2,6 +2,16 @@ import '../../../core/error/failure.dart';
 import 'dto/json_reader.dart';
 
 typedef AbilityText = ({int id, String? nameEs, String? shortEffect});
+typedef EvolutionRecord = ({
+  int speciesId,
+  int fromSpeciesId,
+  int ordinal,
+  String? trigger,
+  int? minLevel,
+  int? minHappiness,
+  String? timeOfDay,
+  String? itemName,
+});
 typedef MoveLearn = ({int moveId, int versionGroupId, int methodId, int level});
 
 /// Lo que trae GetPokemonDetail y la base aún no tenía.
@@ -11,6 +21,8 @@ class PokemonDetailRecord {
     required this.speciesId,
     required this.abilities,
     required this.moves,
+    required this.chainSpeciesIds,
+    required this.evolutions,
     this.speciesNameEs,
     this.genusEs,
   });
@@ -21,6 +33,10 @@ class PokemonDetailRecord {
   final String? genusEs;
   final List<AbilityText> abilities;
   final List<MoveLearn> moves;
+
+  /// Especies de la cadena evolutiva, con o sin condición.
+  final List<int> chainSpeciesIds;
+  final List<EvolutionRecord> evolutions;
 }
 
 /// Valida el `data` de GetPokemonDetail. Lanza [ValidationFailure] si no
@@ -45,6 +61,10 @@ PokemonDetailRecord mapPokemonDetail(Map<String, dynamic> data) {
       for (final slot in reader.objects('pokemonabilities'))
         _abilityText(slot.object('ability')),
     ],
+    chainSpeciesIds: [
+      for (final member in _chain(species)) member.integer('id'),
+    ],
+    evolutions: _evolutions(species),
     moves: [
       for (final move in reader.objects('pokemonmoves'))
         (
@@ -69,4 +89,46 @@ AbilityText _abilityText(JsonReader ability) {
     nameEs: ability.localizedName('abilitynames', 'es'),
     shortEffect: effectIn('es') ?? effectIn('en'),
   );
+}
+
+JsonReader? _optionalObject(JsonReader reader, String key) =>
+    reader.json[key] is Map<String, dynamic> ? reader.object(key) : null;
+
+List<JsonReader> _chain(JsonReader species) =>
+    _optionalObject(species, 'evolutionchain')?.objects('pokemonspecies') ??
+    const [];
+
+List<EvolutionRecord> _evolutions(JsonReader species) {
+  final records = <EvolutionRecord>[];
+  for (final member in _chain(species)) {
+    final from = member.integerOrNull('evolves_from_species_id');
+    if (from == null) continue;
+    final steps = member.objects('pokemonevolutions');
+    if (steps.isEmpty) {
+      records.add((
+        speciesId: member.integer('id'),
+        fromSpeciesId: from,
+        ordinal: 0,
+        trigger: null,
+        minLevel: null,
+        minHappiness: null,
+        timeOfDay: null,
+        itemName: null,
+      ));
+    }
+    for (final (index, step) in steps.indexed) {
+      final timeOfDay = step.stringOrNull('time_of_day');
+      records.add((
+        speciesId: member.integer('id'),
+        fromSpeciesId: from,
+        ordinal: index,
+        trigger: _optionalObject(step, 'evolutiontrigger')?.string('name'),
+        minLevel: step.integerOrNull('min_level'),
+        minHappiness: step.integerOrNull('min_happiness'),
+        timeOfDay: timeOfDay == null || timeOfDay.isEmpty ? null : timeOfDay,
+        itemName: _optionalObject(step, 'item')?.string('name'),
+      ));
+    }
+  }
+  return records;
 }

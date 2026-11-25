@@ -9,6 +9,8 @@ import '../../../ui/components/stat_bar.dart';
 import '../../../ui/components/type_chip.dart';
 import '../../../ui/tokens/regi_colors.dart';
 import '../domain/pokemon_detail.dart';
+import 'pokemon_evolutions_section.dart';
+import 'pokemon_matchups_section.dart';
 import 'pokemon_moves_section.dart';
 
 class PokemonDetailPage extends ConsumerWidget {
@@ -90,6 +92,10 @@ class _Detail extends ConsumerWidget {
         _Panel(child: _Stats(stats: detail.stats)),
         const SizedBox(height: 12),
         _Panel(child: _Abilities(abilities: detail.abilities)),
+        const SizedBox(height: 12),
+        _Panel(child: PokemonEvolutionsSection(pokemonId: pokemon.id)),
+        const SizedBox(height: 12),
+        _Panel(child: PokemonMatchupsSection(types: pokemon.types)),
         const SizedBox(height: 12),
         _Panel(child: PokemonMovesSection(pokemonId: pokemon.id)),
       ],

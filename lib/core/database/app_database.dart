@@ -32,6 +32,7 @@ part 'app_database.g.dart';
     PokemonStats,
     PokemonAbilities,
     PokemonMoves,
+    SpeciesEvolutions,
     Favorites,
     UserPreferences,
     SyncMetadataEntries,
@@ -53,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'regidex'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -66,6 +67,7 @@ class AppDatabase extends _$AppDatabase {
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) await m.createTable(pokemonMoves);
+      if (from < 3) await m.createTable(speciesEvolutions);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
