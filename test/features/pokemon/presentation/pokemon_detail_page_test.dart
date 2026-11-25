@@ -5,6 +5,7 @@ import 'package:regi_dex/app/image_providers.dart';
 import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_detail.dart';
+import 'package:regi_dex/features/pokemon/domain/pokemon_move.dart';
 import 'package:regi_dex/features/pokemon/presentation/pokemon_detail_page.dart';
 import 'package:regi_dex/ui/themes/regi_themes.dart';
 import 'package:regi_dex/ui/tokens/regi_palette.dart';
@@ -34,6 +35,10 @@ Future<void> _open(WidgetTester tester, Stream<PokemonDetail?> detail) async {
     ProviderScope(
       overrides: [
         pokemonDetailProvider(1).overrideWith((ref) => detail),
+        pokemonDetailRefreshProvider(1).overrideWith((ref) => true),
+        pokemonMovesProvider.overrideWith(
+          (ref, request) => const MovePage(moves: [], page: 0, totalPages: 0),
+        ),
         imageCacheManagerProvider.overrideWithValue(FakeImageCache()),
       ],
       child: MaterialApp(

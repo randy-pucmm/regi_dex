@@ -8,6 +8,7 @@ import '../core/connectivity/health_checker.dart';
 import '../core/connectivity/network_source.dart';
 import '../core/connectivity/service_status.dart';
 import '../core/database/app_database.dart';
+import '../core/error/failure.dart';
 import '../core/network/operation_loader.dart';
 import '../core/network/poke_api_client.dart';
 import '../core/network/poke_api_config.dart';
@@ -16,11 +17,12 @@ import '../core/sync/sync_coordinator.dart';
 import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
-import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
+import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
 import '../features/pokemon/domain/pokemon_detail.dart';
 import '../features/pokemon/domain/pokemon_detail_repository.dart';
+import '../features/pokemon/domain/pokemon_move.dart';
 import '../features/pokemon/domain/pokemon_repository.dart';
 import '../features/pokemon/domain/refresh_catalog.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
@@ -140,11 +142,36 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>(
 final pokemonDetailRepositoryProvider = Provider<PokemonDetailRepository>(
   (ref) => PokemonDetailRepositoryImpl(
     catalog: ref.watch(appDatabaseProvider).catalogDao,
+    remote: ref.watch(pokemonRemoteSourceProvider),
   ),
 );
 
 final pokemonDetailProvider = StreamProvider.family<PokemonDetail?, int>(
   (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchDetail(id),
+);
+
+typedef MovesRequest = ({int pokemonId, MoveMethod method, int page});
+
+/// Una página de movimientos de un Pokémon por método. Se
+/// vuelve a leer cuando termina la descarga del detalle.
+final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>((
+  ref,
+  request,
+) {
+  ref.watch(pokemonDetailRefreshProvider(request.pokemonId));
+  return ref
+      .watch(pokemonDetailRepositoryProvider)
+      .moves(request.pokemonId, request.method, page: request.page);
+});
+
+/// Descarga el detalle al abrir un Pokémon. Devuelve false si no se pudo: la
+/// pantalla sigue con lo local.
+final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>(
+  (ref, id) => ref
+      .watch(pokemonDetailRepositoryProvider)
+      .refreshDetail(id)
+      .then((_) => true)
+      .onError<Failure>((_, _) => false),
 );
 
 /// Caso de uso: observar el catálogo.

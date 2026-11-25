@@ -34,4 +34,14 @@ class FakePokemonRemote implements PokemonRemoteSource {
     tamper?.call(page);
     return page;
   }
+
+  /// Respuesta de GetPokemonDetail por id; null hace fallar la llamada.
+  final details = <int, Map<String, dynamic>>{};
+  final detailCalls = <int>[];
+
+  @override
+  Future<Map<String, dynamic>> fetchDetail(int id) async {
+    detailCalls.add(id);
+    return details[id] ?? (throw const NetworkFailure());
+  }
 }

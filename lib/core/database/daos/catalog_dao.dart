@@ -15,6 +15,19 @@ typedef PokemonDetailRows = ({
   List<({AbilityRow ability, bool isHidden})> abilities,
 });
 
+/// Un movimiento que aprende un Pokémon, con los datos del movimiento.
+typedef PokemonMoveEntry = ({
+  int moveId,
+  String name,
+  String? typeName,
+  String? typeNameEs,
+  int? power,
+  int? accuracy,
+  int? pp,
+  int? damageClassId,
+  int level,
+});
+
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
 @DriftAccessor(
   tables: [
@@ -24,6 +37,7 @@ typedef PokemonDetailRows = ({
     PokemonTypes,
     PokemonStats,
     PokemonAbilities,
+    PokemonMoves,
   ],
 )
 class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
@@ -112,6 +126,133 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
             abilities: abilities,
           );
         });
+  }
+
+  /// Guarda lo del detalle en una transacción y marca el Pokémon como
+  /// sincronizado en [syncedAt].
+  Future<void> saveDetail({
+    required int pokemonId,
+    required int speciesId,
+    required DateTime syncedAt,
+    required List<({int id, String? nameEs, String? shortEffect})> abilities,
+    required List<({int moveId, int versionGroupId, int methodId, int level})>
+    moves,
+    String? speciesNameEs,
+    String? genusEs,
+  }) => transaction(() async {
+    final abilityTable = attachedDatabase.abilities;
+    for (final a in abilities) {
+      await (update(abilityTable)..where((t) => t.id.equals(a.id))).write(
+        AbilitiesCompanion(
+          nameEs: Value(a.nameEs),
+          shortEffect: Value(a.shortEffect),
+        ),
+      );
+    }
+    await (delete(
+      pokemonMoves,
+    )..where((m) => m.pokemonId.equals(pokemonId))).go();
+    await batch(
+      (b) => b.insertAll(pokemonMoves, [
+        for (final m in moves)
+          PokemonMovesCompanion.insert(
+            pokemonId: pokemonId,
+            moveId: m.moveId,
+            versionGroupId: m.versionGroupId,
+            methodId: m.methodId,
+            level: Value(m.level),
+          ),
+      ], mode: InsertMode.insertOrIgnore),
+    );
+    await (update(species)..where((s) => s.id.equals(speciesId))).write(
+      SpeciesCompanion(nameEs: Value(speciesNameEs), genusEs: Value(genusEs)),
+    );
+    await (update(pokemons)..where((p) => p.id.equals(pokemonId))).write(
+      PokemonsCompanion(detailSyncedAt: Value(syncedAt)),
+    );
+  });
+
+  /// Indica si hay algún movimiento guardado de [pokemonId].
+  Future<bool> hasMoves(int pokemonId) async =>
+      (await (select(pokemonMoves)
+                ..where((m) => m.pokemonId.equals(pokemonId))
+                ..limit(1))
+              .get())
+          .isNotEmpty;
+
+  /// Condición de las filas de [pokemonId] que se muestran para [methodId]:
+  /// las del juego más reciente donde lo aprende por ese método (los métodos
+  /// no coinciden entre juegos), o todas si es null. Null si no aprende nada
+  /// por ese método.
+  Future<Expression<bool>?> _learned(int pokemonId, int? methodId) async {
+    final ofPokemon = pokemonMoves.pokemonId.equals(pokemonId);
+    if (methodId == null) return ofPokemon;
+    final byMethod = ofPokemon & pokemonMoves.methodId.equals(methodId);
+    final latest = pokemonMoves.versionGroupId.max();
+    final versionGroup =
+        await (selectOnly(pokemonMoves)
+              ..addColumns([latest])
+              ..where(byMethod))
+            .map((row) => row.read(latest))
+            .getSingle();
+    if (versionGroup == null) return null;
+    return byMethod & pokemonMoves.versionGroupId.equals(versionGroup);
+  }
+
+  /// Cantidad de movimientos distintos de [pokemonId] que muestra
+  /// [getMoves] para [methodId].
+  Future<int> countMoves(int pokemonId, {int? methodId}) async {
+    final condition = await _learned(pokemonId, methodId);
+    if (condition == null) return 0;
+    final count = pokemonMoves.moveId.count(distinct: true);
+    return (selectOnly(pokemonMoves)
+          ..addColumns([count])
+          ..where(condition))
+        .map((row) => row.read(count)!)
+        .getSingle();
+  }
+
+  /// Movimientos de [pokemonId] por [methodId] (todos si es null, cada uno
+  /// una vez y por nombre; si no, por nivel y nombre). [limit] y [offset]
+  /// paginan en la consulta.
+  Future<List<PokemonMoveEntry>> getMoves(
+    int pokemonId, {
+    required int? methodId,
+    required int limit,
+    int offset = 0,
+  }) async {
+    final condition = await _learned(pokemonId, methodId);
+    if (condition == null) return const [];
+
+    final moveTable = attachedDatabase.moves;
+    final typeTable = attachedDatabase.types;
+    final query =
+        select(pokemonMoves).join([
+            innerJoin(moveTable, moveTable.id.equalsExp(pokemonMoves.moveId)),
+            leftOuterJoin(typeTable, typeTable.id.equalsExp(moveTable.typeId)),
+          ])
+          ..where(condition)
+          ..orderBy([
+            if (methodId != null) OrderingTerm.asc(pokemonMoves.level),
+            OrderingTerm.asc(moveTable.name),
+          ])
+          ..limit(limit, offset: offset);
+    if (methodId == null) query.groupBy([pokemonMoves.moveId]);
+    return query.map((row) {
+      final move = row.readTable(moveTable);
+      final type = row.readTableOrNull(typeTable);
+      return (
+        moveId: move.id,
+        name: move.name,
+        typeName: type?.name,
+        typeNameEs: type?.nameEs,
+        power: move.power,
+        accuracy: move.accuracy,
+        pp: move.pp,
+        damageClassId: move.damageClassId,
+        level: row.read(pokemonMoves.level)!,
+      );
+    }).get();
   }
 
   /// Cantidad de Pokémon del catálogo, como flujo.

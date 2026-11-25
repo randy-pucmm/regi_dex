@@ -9,6 +9,7 @@ import '../../../ui/components/stat_bar.dart';
 import '../../../ui/components/type_chip.dart';
 import '../../../ui/tokens/regi_colors.dart';
 import '../domain/pokemon_detail.dart';
+import 'pokemon_moves_section.dart';
 
 class PokemonDetailPage extends ConsumerWidget {
   const PokemonDetailPage({super.key, required this.id});
@@ -17,6 +18,7 @@ class PokemonDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(pokemonDetailRefreshProvider(id));
     final detail = ref.watch(pokemonDetailProvider(id));
     return Column(
       children: [
@@ -24,7 +26,6 @@ class PokemonDetailPage extends ConsumerWidget {
           alignment: Alignment.centerLeft,
           child: IconButton(
             tooltip: 'Volver',
-            color: RegiInk.onShell,
             constraints: const BoxConstraints.tightFor(width: 48, height: 48),
             onPressed: () => context.pop(),
             icon: const Icon(Icons.arrow_back),
@@ -73,13 +74,9 @@ class _Detail extends ConsumerWidget {
         Text(
           'N.º ${pokemon.id.toString().padLeft(4, '0')}',
           textAlign: TextAlign.center,
-          style: text.labelMedium?.copyWith(color: RegiInk.onShellMuted),
+          style: text.labelMedium,
         ),
-        Text(
-          name,
-          textAlign: TextAlign.center,
-          style: text.headlineMedium?.copyWith(color: RegiInk.onShell),
-        ),
+        Text(name, textAlign: TextAlign.center, style: text.headlineMedium),
         const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
@@ -90,12 +87,32 @@ class _Detail extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 20),
-        _Stats(stats: detail.stats),
-        const SizedBox(height: 20),
-        _Abilities(abilities: detail.abilities),
+        _Panel(child: _Stats(stats: detail.stats)),
+        const SizedBox(height: 12),
+        _Panel(child: _Abilities(abilities: detail.abilities)),
+        const SizedBox(height: 12),
+        _Panel(child: PokemonMovesSection(pokemonId: pokemon.id)),
       ],
     );
   }
+}
+
+/// Tarjeta oscura: los textos y las barras de las secciones están pensados
+/// para fondo oscuro.
+class _Panel extends StatelessWidget {
+  const _Panel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: RegiInk.shell,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: RegiInk.onShellMuted),
+    ),
+    child: Padding(padding: const EdgeInsets.all(14), child: child),
+  );
 }
 
 class _Stats extends StatelessWidget {
@@ -109,7 +126,7 @@ class _Stats extends StatelessWidget {
       return const _Notice('Las estadísticas se descargan con conexión.');
     }
     return Wrap(
-      spacing: 16,
+      alignment: WrapAlignment.spaceBetween,
       runSpacing: 12,
       children: [
         for (final stat in RegiStat.values)
