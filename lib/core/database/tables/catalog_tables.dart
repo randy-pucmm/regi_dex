@@ -104,3 +104,28 @@ class PokemonAbilities extends Table {
   @override
   Set<Column> get primaryKey => {pokemonId, slot};
 }
+
+/// Movimiento que un Pokémon aprende en un grupo de versiones. `moveId` y
+/// `versionGroupId` no son FK: los datos de referencia pueden llegar después.
+/// `methodId` es el de PokéAPI (1 nivel, 2 huevo, 3 tutor, 4 MT).
+@DataClassName('PokemonMoveRow')
+@TableIndex(name: 'idx_pokemon_move_pokemon_id', columns: {#pokemonId})
+class PokemonMoves extends Table {
+  @override
+  String get tableName => 'pokemon_move';
+
+  IntColumn get pokemonId => integer().references(Pokemons, #id)();
+  IntColumn get moveId => integer()();
+  IntColumn get versionGroupId => integer()();
+  IntColumn get methodId => integer()();
+  IntColumn get level => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {
+    pokemonId,
+    moveId,
+    versionGroupId,
+    methodId,
+    level,
+  };
+}
