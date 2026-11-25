@@ -17,16 +17,20 @@ import '../core/sync/sync_coordinator.dart';
 import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
+import '../features/pokemon/data/detail_sync.dart';
 import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
+import '../features/pokemon/data/remote_search.dart';
 import '../features/pokemon/domain/evolution_chain.dart';
 import '../features/pokemon/domain/pokemon_detail.dart';
 import '../features/pokemon/domain/pokemon_detail_repository.dart';
 import '../features/pokemon/domain/pokemon_move.dart';
-import '../features/pokemon/domain/type_chart.dart';
 import '../features/pokemon/domain/pokemon_repository.dart';
 import '../features/pokemon/domain/refresh_catalog.dart';
+import '../features/pokemon/domain/search_pokemon_remote.dart';
+import '../features/pokemon/domain/sync_pokemon_detail.dart';
+import '../features/pokemon/domain/type_chart.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
@@ -130,6 +134,23 @@ final catalogSyncProvider = Provider<CatalogSync>(
   ),
 );
 
+/// Sincronización del detalle bajo demanda (una llamada por Pokémon).
+final detailSyncProvider = Provider<DetailSync>(
+  (ref) => DetailSync(
+    remote: ref.watch(pokemonRemoteSourceProvider),
+    local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
+    coordinator: ref.watch(syncCoordinatorProvider),
+  ),
+);
+
+/// Respaldo remoto de la búsqueda (una llamada, resultados a la base).
+final remoteSearchProvider = Provider<RemoteSearch>(
+  (ref) => RemoteSearch(
+    remote: ref.watch(pokemonRemoteSourceProvider),
+    local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
+  ),
+);
+
 /// Repositorio del catálogo: lo que la interfaz consume en lugar de GraphQL
 /// o Drift. Las pruebas lo sobrescriben con uno falso.
 final pokemonRepositoryProvider = Provider<PokemonRepository>(
@@ -137,14 +158,37 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>(
     catalog: ref.watch(appDatabaseProvider).catalogDao,
     coordinator: ref.watch(syncCoordinatorProvider),
     sync: ref.watch(catalogSyncProvider),
+    detail: ref.watch(detailSyncProvider),
+    search: ref.watch(remoteSearchProvider),
+    reference: ref.watch(appDatabaseProvider).referenceDao,
+    preferences: ref.watch(appDatabaseProvider).preferenceDao,
   ),
+);
+
+/// Caso de uso: observar el catálogo.
+final watchPokemonProvider = Provider<WatchPokemon>(
+  (ref) => WatchPokemon(ref.watch(pokemonRepositoryProvider)),
+);
+
+/// Caso de uso: sincronizar el catálogo ahora.
+final refreshCatalogProvider = Provider<RefreshCatalog>(
+  (ref) => RefreshCatalog(ref.watch(pokemonRepositoryProvider)),
+);
+
+/// Caso de uso: buscar en PokéAPI cuando lo local no tiene resultados.
+final searchPokemonRemoteProvider = Provider<SearchPokemonRemote>(
+  (ref) => SearchPokemonRemote(ref.watch(pokemonRepositoryProvider)),
+);
+
+/// Caso de uso: traer el detalle de un Pokémon al abrirlo.
+final syncPokemonDetailProvider = Provider<SyncPokemonDetail>(
+  (ref) => SyncPokemonDetail(ref.watch(pokemonRepositoryProvider)),
 );
 
 final pokemonDetailRepositoryProvider = Provider<PokemonDetailRepository>(
   (ref) => PokemonDetailRepositoryImpl(
     catalog: ref.watch(appDatabaseProvider).catalogDao,
     reference: ref.watch(appDatabaseProvider).referenceDao,
-    remote: ref.watch(pokemonRemoteSourceProvider),
   ),
 );
 
@@ -191,18 +235,7 @@ final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>(
 /// pantalla sigue con lo local.
 final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>(
   (ref, id) => ref
-      .watch(pokemonDetailRepositoryProvider)
-      .refreshDetail(id)
+      .watch(syncPokemonDetailProvider)(id)
       .then((_) => true)
       .onError<Failure>((_, _) => false),
-);
-
-/// Caso de uso: observar el catálogo.
-final watchPokemonProvider = Provider<WatchPokemon>(
-  (ref) => WatchPokemon(ref.watch(pokemonRepositoryProvider)),
-);
-
-/// Caso de uso: sincronizar el catálogo ahora.
-final refreshCatalogProvider = Provider<RefreshCatalog>(
-  (ref) => RefreshCatalog(ref.watch(pokemonRepositoryProvider)),
 );

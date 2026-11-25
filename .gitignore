@@ -63,3 +63,6 @@ app.*.map.json
 
 # Código generado por build_runner (dart run build_runner build).
 *.g.dart
+
+# Copia local de la base del dispositivo (tools/pull_db.ps1)
+/tools/db/

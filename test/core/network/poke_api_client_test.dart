@@ -77,6 +77,35 @@ void main() {
       expect(logs.single, contains('HTTP 200'));
     });
 
+    test('la línea de consola incluye las variables de la consulta', () async {
+      serve((_) async => _json(_healthData));
+
+      await client.execute(
+        GraphqlOperation.getPokemonDetail,
+        variables: {
+          'id': 25,
+          'langs': ['es', 'en'],
+        },
+      );
+
+      expect(
+        logs.single,
+        contains('[GraphQL] GetPokemonDetail {id: 25, langs: [es, en]} ok'),
+      );
+    });
+
+    test('acorta las variables muy largas', () async {
+      serve((_) async => _json(_healthData));
+
+      await client.execute(
+        GraphqlOperation.getPokemonsByIds,
+        variables: {'ids': List.generate(200, (i) => i + 1)},
+      );
+
+      expect(logs.single.length, lessThan(220));
+      expect(logs.single, contains('…}'));
+    });
+
     test(
       'envía un POST JSON al endpoint con la operación y sus variables',
       () async {

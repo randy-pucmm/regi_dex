@@ -714,6 +714,26 @@
             "dsl_features": []
           },
           {
+            "name": "sprite_shiny_url",
+            "getter_name": "spriteShinyUrl",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "artwork_shiny_url",
+            "getter_name": "artworkShinyUrl",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
             "name": "content_hash",
             "getter_name": "contentHash",
             "moor_type": "string",
@@ -1001,7 +1021,9 @@
     {
       "id": 13,
       "references": [
-        9
+        9,
+        4,
+        5
       ],
       "type": "table",
       "data": {
@@ -1040,9 +1062,25 @@
             "moor_type": "int",
             "nullable": false,
             "customConstraints": null,
+            "defaultConstraints": "REFERENCES move (id)",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES move (id)"
+            },
             "default_dart": null,
             "default_client_dart": null,
-            "dsl_features": []
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "move",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": null
+                }
+              }
+            ]
           },
           {
             "name": "version_group_id",
@@ -1050,13 +1088,29 @@
             "moor_type": "int",
             "nullable": false,
             "customConstraints": null,
+            "defaultConstraints": "REFERENCES version_group (id)",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES version_group (id)"
+            },
             "default_dart": null,
             "default_client_dart": null,
-            "dsl_features": []
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "version_group",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": null
+                }
+              }
+            ]
           },
           {
-            "name": "method_id",
-            "getter_name": "methodId",
+            "name": "learn_method_id",
+            "getter_name": "learnMethodId",
             "moor_type": "int",
             "nullable": false,
             "customConstraints": null,
@@ -1082,13 +1136,256 @@
           "pokemon_id",
           "move_id",
           "version_group_id",
-          "method_id",
+          "learn_method_id",
           "level"
         ]
       }
     },
     {
       "id": 14,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "evolution",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "PRIMARY KEY AUTOINCREMENT",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "PRIMARY KEY AUTOINCREMENT"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "chain_id",
+            "getter_name": "chainId",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "from_species_id",
+            "getter_name": "fromSpeciesId",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "to_species_id",
+            "getter_name": "toSpeciesId",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "to_species_name",
+            "getter_name": "toSpeciesName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "trigger",
+            "getter_name": "trigger",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "min_level",
+            "getter_name": "minLevel",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "min_happiness",
+            "getter_name": "minHappiness",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "time_of_day",
+            "getter_name": "timeOfDay",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "item",
+            "getter_name": "item",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 15,
+      "references": [
+        7
+      ],
+      "type": "table",
+      "data": {
+        "name": "pokemon_form",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "pokemon_id",
+            "getter_name": "pokemonId",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "species_id",
+            "getter_name": "speciesId",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES species (id)",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES species (id)"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "species",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "form_name",
+            "getter_name": "formName",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_default",
+            "getter_name": "isDefault",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "CHECK (\"is_default\" IN (0, 1))",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "CHECK (\"is_default\" IN (0, 1))"
+            },
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_mega",
+            "getter_name": "isMega",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "CHECK (\"is_mega\" IN (0, 1))",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "CHECK (\"is_mega\" IN (0, 1))"
+            },
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "type1_id",
+            "getter_name": "type1Id",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "type2_id",
+            "getter_name": "type2Id",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "pokemon_id"
+        ]
+      }
+    },
+    {
+      "id": 16,
       "references": [],
       "type": "table",
       "data": {
@@ -1135,7 +1432,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 17,
       "references": [],
       "type": "table",
       "data": {
@@ -1172,7 +1469,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 18,
       "references": [],
       "type": "table",
       "data": {
@@ -1269,7 +1566,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 19,
       "references": [],
       "type": "table",
       "data": {
@@ -1329,7 +1626,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 20,
       "references": [
         7
       ],
@@ -1348,7 +1645,7 @@
       }
     },
     {
-      "id": 19,
+      "id": 21,
       "references": [
         8
       ],
@@ -1367,7 +1664,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 22,
       "references": [
         9
       ],
@@ -1386,7 +1683,7 @@
       }
     },
     {
-      "id": 21,
+      "id": 23,
       "references": [
         9
       ],
@@ -1405,7 +1702,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 24,
       "references": [
         10
       ],
@@ -1424,7 +1721,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 25,
       "references": [
         12
       ],
@@ -1443,32 +1740,51 @@
       }
     },
     {
-      "id": 24,
+      "id": 26,
       "references": [
-        13
+        14
       ],
       "type": "index",
       "data": {
-        "on": 13,
-        "name": "idx_pokemon_move_pokemon_id",
+        "on": 14,
+        "name": "idx_evolution_chain_id",
         "sql": null,
         "unique": false,
         "columns": [
           {
-            "column": "pokemon_id",
+            "column": "chain_id",
             "order_by": null
           }
         ]
       }
     },
     {
-      "id": 25,
+      "id": 27,
       "references": [
-        17
+        15
       ],
       "type": "index",
       "data": {
-        "on": 17,
+        "on": 15,
+        "name": "idx_pokemon_form_species_id",
+        "sql": null,
+        "unique": false,
+        "columns": [
+          {
+            "column": "species_id",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "references": [
+        19
+      ],
+      "type": "index",
+      "data": {
+        "on": 19,
         "name": "idx_api_call_log_called_at",
         "sql": null,
         "unique": false,
@@ -1568,7 +1884,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon\" (\"id\" INTEGER NOT NULL, \"species_id\" INTEGER NOT NULL REFERENCES species (id), \"name\" TEXT NOT NULL, \"is_default\" INTEGER NOT NULL DEFAULT 1 CHECK (\"is_default\" IN (0, 1)), \"height\" INTEGER NOT NULL DEFAULT 0, \"weight\" INTEGER NOT NULL DEFAULT 0, \"base_stat_total\" INTEGER NOT NULL DEFAULT 0, \"sprite_url\" TEXT NULL, \"artwork_url\" TEXT NULL, \"content_hash\" TEXT NULL, \"light_synced_at\" INTEGER NOT NULL, \"detail_synced_at\" INTEGER NULL, PRIMARY KEY (\"id\"));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon\" (\"id\" INTEGER NOT NULL, \"species_id\" INTEGER NOT NULL REFERENCES species (id), \"name\" TEXT NOT NULL, \"is_default\" INTEGER NOT NULL DEFAULT 1 CHECK (\"is_default\" IN (0, 1)), \"height\" INTEGER NOT NULL DEFAULT 0, \"weight\" INTEGER NOT NULL DEFAULT 0, \"base_stat_total\" INTEGER NOT NULL DEFAULT 0, \"sprite_url\" TEXT NULL, \"artwork_url\" TEXT NULL, \"sprite_shiny_url\" TEXT NULL, \"artwork_shiny_url\" TEXT NULL, \"content_hash\" TEXT NULL, \"light_synced_at\" INTEGER NOT NULL, \"detail_synced_at\" INTEGER NULL, PRIMARY KEY (\"id\"));"
         }
       ]
     },
@@ -1604,7 +1920,25 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon_move\" (\"pokemon_id\" INTEGER NOT NULL REFERENCES pokemon (id), \"move_id\" INTEGER NOT NULL, \"version_group_id\" INTEGER NOT NULL, \"method_id\" INTEGER NOT NULL, \"level\" INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (\"pokemon_id\", \"move_id\", \"version_group_id\", \"method_id\", \"level\"));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon_move\" (\"pokemon_id\" INTEGER NOT NULL REFERENCES pokemon (id), \"move_id\" INTEGER NOT NULL REFERENCES move (id), \"version_group_id\" INTEGER NOT NULL REFERENCES version_group (id), \"learn_method_id\" INTEGER NOT NULL, \"level\" INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (\"pokemon_id\", \"move_id\", \"version_group_id\", \"learn_method_id\", \"level\"));"
+        }
+      ]
+    },
+    {
+      "name": "evolution",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"evolution\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"chain_id\" INTEGER NOT NULL, \"from_species_id\" INTEGER NULL, \"to_species_id\" INTEGER NOT NULL, \"to_species_name\" TEXT NOT NULL, \"trigger\" TEXT NULL, \"min_level\" INTEGER NULL, \"min_happiness\" INTEGER NULL, \"time_of_day\" TEXT NULL, \"item\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "pokemon_form",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"pokemon_form\" (\"pokemon_id\" INTEGER NOT NULL, \"species_id\" INTEGER NOT NULL REFERENCES species (id), \"name\" TEXT NOT NULL, \"form_name\" TEXT NULL, \"is_default\" INTEGER NOT NULL DEFAULT 0 CHECK (\"is_default\" IN (0, 1)), \"is_mega\" INTEGER NOT NULL DEFAULT 0 CHECK (\"is_mega\" IN (0, 1)), \"type1_id\" INTEGER NULL, \"type2_id\" INTEGER NULL, PRIMARY KEY (\"pokemon_id\"));"
         }
       ]
     },
@@ -1699,11 +2033,20 @@
       ]
     },
     {
-      "name": "idx_pokemon_move_pokemon_id",
+      "name": "idx_evolution_chain_id",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX idx_pokemon_move_pokemon_id ON pokemon_move (pokemon_id)"
+          "sql": "CREATE INDEX idx_evolution_chain_id ON evolution (chain_id)"
+        }
+      ]
+    },
+    {
+      "name": "idx_pokemon_form_species_id",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX idx_pokemon_form_species_id ON pokemon_form (species_id)"
         }
       ]
     },

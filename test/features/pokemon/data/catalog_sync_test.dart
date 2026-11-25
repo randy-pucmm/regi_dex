@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:regi_dex/core/database/app_database.dart';
+import 'package:regi_dex/core/database/preference_keys.dart';
 import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/network/operation_loader.dart';
 import 'package:regi_dex/core/network/poke_api_client.dart';
@@ -207,6 +208,45 @@ void main() {
       await runSync(sync);
 
       expect(remote.referenceCalls, 2);
+    });
+
+    test('guarda el total de Pokémon que informa la API', () async {
+      await runSync(syncWith(FakePokemonRemote(total: 450)));
+
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogTotal),
+        '450',
+      );
+    });
+
+    test('un total nuevo reemplaza al anterior', () async {
+      await runSync(syncWith(FakePokemonRemote(total: 450)));
+      time.advance(const Duration(days: 31));
+      await runSync(syncWith(FakePokemonRemote(total: 460)));
+
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogTotal),
+        '460',
+      );
+    });
+
+    test('una referencia vigente sin total se pide una vez más', () async {
+      final remote = FakePokemonRemote();
+      final sync = syncWith(remote);
+      await runSync(sync);
+      // Como una instalación anterior: referencia hecha pero sin total.
+      await db.preferenceDao.remove(PreferenceKeys.catalogTotal);
+
+      time.advance(const Duration(days: 1));
+      await runSync(sync);
+      time.advance(const Duration(days: 1));
+      await runSync(sync);
+
+      expect(remote.referenceCalls, 2);
+      expect(
+        await db.preferenceDao.getValue(PreferenceKeys.catalogTotal),
+        '450',
+      );
     });
 
     test('un fallo en la referencia no pide ninguna página', () async {
@@ -463,4 +503,11 @@ class _FailingReference implements PokemonRemoteSource {
 
   @override
   Future<Map<String, dynamic>> fetchDetail(int id) => _inner.fetchDetail(id);
+
+  @override
+  Future<Map<String, dynamic>> searchPokemon({
+    String? name,
+    int? number,
+    int limit = PokemonRemoteSource.searchLimit,
+  }) => _inner.searchPokemon(name: name, number: number, limit: limit);
 }

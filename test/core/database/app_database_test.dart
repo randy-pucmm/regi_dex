@@ -20,8 +20,8 @@ void main() {
     return [for (final row in rows) row.read<String>('name')];
   }
 
-  test('schemaVersion es 3', () {
-    expect(db.schemaVersion, 3);
+  test('schemaVersion es 2', () {
+    expect(db.schemaVersion, 2);
   });
 
   test('crea las tablas con los nombres del documento', () async {
@@ -42,7 +42,8 @@ void main() {
         'pokemon_stat',
         'pokemon_ability',
         'pokemon_move',
-        'species_evolution',
+        'evolution',
+        'pokemon_form',
         'favorite',
         'user_preference',
         'sync_metadata',
@@ -61,9 +62,10 @@ void main() {
         'idx_species_generation_id',
         'idx_pokemon_type_type_id',
         'idx_pokemon_ability_ability_id',
-        'idx_pokemon_move_pokemon_id',
         'idx_species_egg_group_egg_group_id',
         'idx_api_call_log_called_at',
+        'idx_evolution_chain_id',
+        'idx_pokemon_form_species_id',
       ]),
     );
   });
@@ -103,6 +105,7 @@ void main() {
       'pokemon_stat',
       'pokemon_ability',
       'pokemon_move',
+      'pokemon_form',
     ];
     for (final table in tables) {
       final fks = await db

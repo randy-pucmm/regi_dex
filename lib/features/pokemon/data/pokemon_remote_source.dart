@@ -11,6 +11,9 @@ class PokemonRemoteSource {
   final PokeApiClient _client;
   final ApiBudget _budget;
 
+  /// Máximo de resultados de una búsqueda remota.
+  static const searchLimit = 20;
+
   /// Idiomas pedidos en los datos de referencia.
   static const languages = ['es', 'en'];
 
@@ -29,6 +32,21 @@ class PokemonRemoteSource {
     'offset': offset,
   });
 
+  /// SearchPokemonRemote: hasta [limit] Pokémon por defecto cuyo nombre contiene
+  /// [name] o cuyo número nacional es [number]; se da uno solo de los dos.
+  /// Entrega la lista `pokemon` dentro del `data`.
+  Future<Map<String, dynamic>> searchPokemon({
+    String? name,
+    int? number,
+    int limit = searchLimit,
+  }) => _call(GraphqlOperation.searchPokemonRemote, {
+    'pattern': name == null ? '' : '%${_escapeLike(name)}%',
+    'id': number ?? 0,
+    'limit': limit,
+  });
+
+  /// GetPokemonDetail: el detalle completo de [id], con su cadena evolutiva,
+  /// en una sola llamada. Entrega la lista `pokemon` (0 o 1 elemento).
   Future<Map<String, dynamic>> fetchDetail(int id) =>
       _call(GraphqlOperation.getPokemonDetail, {'id': id, 'langs': languages});
 
@@ -40,3 +58,7 @@ class PokemonRemoteSource {
     () => _client.execute(operation, variables: variables),
   );
 }
+
+/// Escapa `\`, `%` y `_` para que `_ilike` los trate como texto literal.
+String _escapeLike(String text) =>
+    text.replaceAllMapped(RegExp(r'[\\%_]'), (match) => '\\${match[0]}');

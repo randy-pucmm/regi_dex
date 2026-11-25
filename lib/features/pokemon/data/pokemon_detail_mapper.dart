@@ -1,134 +1,172 @@
-import '../../../core/error/failure.dart';
-import 'dto/json_reader.dart';
+import 'package:drift/drift.dart';
 
-typedef AbilityText = ({int id, String? nameEs, String? shortEffect});
-typedef EvolutionRecord = ({
-  int speciesId,
-  int fromSpeciesId,
-  int ordinal,
-  String? trigger,
-  int? minLevel,
-  int? minHappiness,
-  String? timeOfDay,
-  String? itemName,
-});
-typedef MoveLearn = ({int moveId, int versionGroupId, int methodId, int level});
+import '../../../core/database/app_database.dart';
+import 'content_hash.dart';
+import 'dto/pokemon_detail_dto.dart';
+import 'dto/pokemon_light_dto.dart';
 
-/// Lo que trae GetPokemonDetail y la base aún no tenía.
+// Funciones puras de DTO a filas para el detalle. Solo reciben y devuelven datos
+// simples, así que se pueden ejecutar dentro de `Isolate.run`.
+
+/// Detalle de un Pokémon listo para guardarse en una sola transacción.
 class PokemonDetailRecord {
   const PokemonDetailRecord({
-    required this.pokemonId,
-    required this.speciesId,
+    required this.species,
+    required this.eggGroupIds,
+    required this.pokemon,
+    required this.types,
+    required this.stats,
     required this.abilities,
+    required this.abilityRows,
     required this.moves,
-    required this.chainSpeciesIds,
+    required this.forms,
     required this.evolutions,
-    this.speciesNameEs,
-    this.genusEs,
+    required this.contentHash,
+    this.evolutionChainId,
   });
 
-  final int pokemonId;
-  final int speciesId;
-  final String? speciesNameEs;
-  final String? genusEs;
-  final List<AbilityText> abilities;
-  final List<MoveLearn> moves;
+  final SpeciesCompanion species;
+  final List<int> eggGroupIds;
+  final PokemonsCompanion pokemon;
+  final List<({int slot, int typeId})> types;
+  final List<({int statId, int baseStat})> stats;
+  final List<({int slot, int abilityId, bool isHidden})> abilities;
 
-  /// Especies de la cadena evolutiva, con o sin condición.
-  final List<int> chainSpeciesIds;
-  final List<EvolutionRecord> evolutions;
+  /// Habilidades del Pokémon con su texto en español, para completar `ability`.
+  final List<AbilitiesCompanion> abilityRows;
+  final List<PokemonMovesCompanion> moves;
+  final List<PokemonFormsCompanion> forms;
+
+  /// Cadena evolutiva de la especie; vacía (y sin id) si no tiene.
+  final int? evolutionChainId;
+  final List<EvolutionsCompanion> evolutions;
+
+  /// `content_hash` calculado con los datos remotos, para compararlo con el local.
+  final String contentHash;
 }
 
-/// Valida el `data` de GetPokemonDetail. Lanza [ValidationFailure] si no
-/// trae el Pokémon o le falta un campo.
-PokemonDetailRecord mapPokemonDetail(Map<String, dynamic> data) {
-  final pokemon = JsonReader(data, 'data').objects('pokemon');
-  if (pokemon.isEmpty) {
-    throw const ValidationFailure('data.pokemon: el Pokémon no existe');
-  }
-  final reader = pokemon.first;
-  final species = reader.object('pokemonspecy');
-  final names = species.objects('pokemonspeciesnames');
-  final spanish = names
-      .where((n) => n.object('language').string('name') == 'es')
-      .firstOrNull;
+/// Valida y convierte el `data` de GetPokemonDetail. [syncedAt] se pasa de fuera
+/// porque el reloj inyectable no cruza isolates. Lanza `ValidationFailure` si la
+/// respuesta no cumple el formato y no devuelve nada.
+PokemonDetailRecord mapPokemonDetail(
+  Map<String, dynamic> data,
+  DateTime syncedAt,
+) {
+  final dto = PokemonDetailDto.fromData(data);
+  final types = [for (final t in dto.types) (slot: t.slot, typeId: t.typeId)];
+  final stats = [
+    for (final s in dto.stats) (statId: s.statId, baseStat: s.baseStat),
+  ];
+  final abilities = [
+    for (final a in dto.abilities)
+      (slot: a.slot, abilityId: a.abilityId, isHidden: a.isHidden),
+  ];
+  final hash = computeContentHash(
+    name: dto.name,
+    height: dto.height,
+    weight: dto.weight,
+    types: types,
+    abilities: abilities,
+    stats: stats,
+  );
+  final species = dto.species;
+
   return PokemonDetailRecord(
-    pokemonId: reader.integer('id'),
-    speciesId: species.integer('id'),
-    speciesNameEs: spanish?.string('name'),
-    genusEs: spanish?.stringOrNull('genus'),
-    abilities: [
-      for (final slot in reader.objects('pokemonabilities'))
-        _abilityText(slot.object('ability')),
-    ],
-    chainSpeciesIds: [
-      for (final member in _chain(species)) member.integer('id'),
-    ],
-    evolutions: _evolutions(species),
-    moves: [
-      for (final move in reader.objects('pokemonmoves'))
-        (
-          moveId: move.integer('move_id'),
-          versionGroupId: move.integer('version_group_id'),
-          methodId: move.integer('move_learn_method_id'),
-          level: move.integerOrNull('level') ?? 0,
+    species: SpeciesCompanion.insert(
+      id: Value(species.id),
+      name: species.name,
+      generationId: species.generationId,
+      evolutionChainId: Value(species.evolutionChainId),
+      isLegendary: Value(species.isLegendary),
+      isMythical: Value(species.isMythical),
+      nameEs: Value(species.nameEs),
+      genusEs: Value(species.genusEs),
+    ),
+    eggGroupIds: species.eggGroupIds,
+    pokemon: PokemonsCompanion.insert(
+      id: Value(dto.id),
+      speciesId: species.id,
+      name: dto.name,
+      height: Value(dto.height),
+      weight: Value(dto.weight),
+      baseStatTotal: Value(dto.baseStatTotal),
+      spriteUrl: Value(dto.spriteUrl),
+      artworkUrl: Value(dto.artworkUrl),
+      spriteShinyUrl: Value(dto.spriteShinyUrl),
+      artworkShinyUrl: Value(dto.artworkShinyUrl),
+      contentHash: Value(hash),
+      // El detalle trae todos los campos del catálogo ligero.
+      lightSyncedAt: syncedAt,
+      detailSyncedAt: Value(syncedAt),
+    ),
+    types: types,
+    stats: stats,
+    abilities: abilities,
+    abilityRows: [
+      for (final a in dto.abilities)
+        AbilitiesCompanion.insert(
+          id: Value(a.abilityId),
+          name: a.name,
+          nameEs: Value(a.nameEs),
+          shortEffect: Value(a.shortEffect),
         ),
     ],
+    moves: _mapMoves(dto),
+    forms: [
+      for (final v in species.variants)
+        PokemonFormsCompanion.insert(
+          pokemonId: Value(v.id),
+          speciesId: species.id,
+          name: v.name,
+          formName: Value(v.formName),
+          isDefault: Value(v.isDefault),
+          isMega: Value(v.isMega),
+          type1Id: Value(_typeAt(v.types, 1)),
+          type2Id: Value(_typeAt(v.types, 2)),
+        ),
+    ],
+    evolutionChainId: species.evolutionChainId,
+    evolutions: [
+      if (species.evolutionChainId != null)
+        for (final e in species.evolutions)
+          EvolutionsCompanion.insert(
+            chainId: species.evolutionChainId!,
+            toSpeciesId: e.toSpeciesId,
+            toSpeciesName: e.toSpeciesName,
+            fromSpeciesId: Value(e.fromSpeciesId),
+            trigger: Value(e.trigger),
+            minLevel: Value(e.minLevel),
+            minHappiness: Value(e.minHappiness),
+            timeOfDay: Value(e.timeOfDay),
+            item: Value(e.item),
+          ),
+    ],
+    contentHash: hash,
   );
 }
 
-AbilityText _abilityText(JsonReader ability) {
-  String? effectIn(String language) => ability
-      .objects('abilityeffecttexts')
-      .where((e) => e.object('language').string('name') == language)
-      .map((e) => e.string('short_effect'))
-      .firstOrNull;
-
-  return (
-    id: ability.integer('id'),
-    nameEs: ability.localizedName('abilitynames', 'es'),
-    shortEffect: effectIn('es') ?? effectIn('en'),
-  );
+/// Movimientos sin repetir la clave primaria (la API puede repetir filas).
+List<PokemonMovesCompanion> _mapMoves(PokemonDetailDto dto) {
+  final seen = <String>{};
+  return [
+    for (final m in dto.moves)
+      if (seen.add(
+        '${m.moveId}:${m.versionGroupId}:${m.learnMethodId}:${m.level}',
+      ))
+        PokemonMovesCompanion.insert(
+          pokemonId: dto.id,
+          moveId: m.moveId,
+          versionGroupId: m.versionGroupId,
+          learnMethodId: m.learnMethodId,
+          level: Value(m.level),
+        ),
+  ];
 }
 
-JsonReader? _optionalObject(JsonReader reader, String key) =>
-    reader.json[key] is Map<String, dynamic> ? reader.object(key) : null;
-
-List<JsonReader> _chain(JsonReader species) =>
-    _optionalObject(species, 'evolutionchain')?.objects('pokemonspecies') ??
-    const [];
-
-List<EvolutionRecord> _evolutions(JsonReader species) {
-  final records = <EvolutionRecord>[];
-  for (final member in _chain(species)) {
-    final from = member.integerOrNull('evolves_from_species_id');
-    if (from == null) continue;
-    final steps = member.objects('pokemonevolutions');
-    if (steps.isEmpty) {
-      records.add((
-        speciesId: member.integer('id'),
-        fromSpeciesId: from,
-        ordinal: 0,
-        trigger: null,
-        minLevel: null,
-        minHappiness: null,
-        timeOfDay: null,
-        itemName: null,
-      ));
-    }
-    for (final (index, step) in steps.indexed) {
-      final timeOfDay = step.stringOrNull('time_of_day');
-      records.add((
-        speciesId: member.integer('id'),
-        fromSpeciesId: from,
-        ordinal: index,
-        trigger: _optionalObject(step, 'evolutiontrigger')?.string('name'),
-        minLevel: step.integerOrNull('min_level'),
-        minHappiness: step.integerOrNull('min_happiness'),
-        timeOfDay: timeOfDay == null || timeOfDay.isEmpty ? null : timeOfDay,
-        itemName: _optionalObject(step, 'item')?.string('name'),
-      ));
-    }
+/// Id del tipo del slot [slot], o null si la variante no lo tiene.
+int? _typeAt(List<PokemonTypeSlotDto> types, int slot) {
+  for (final type in types) {
+    if (type.slot == slot) return type.typeId;
   }
-  return records;
+  return null;
 }

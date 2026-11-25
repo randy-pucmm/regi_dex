@@ -74,21 +74,17 @@ class MovePage {
 }
 
 class MoveGame {
-  const MoveGame({required this.id, this.name});
+  const MoveGame({required this.id, required this.name});
 
   final int id;
 
-  /// Nombre de PokéAPI (`red-blue`), si la referencia ya lo tiene.
-  final String? name;
+  /// Nombre de PokéAPI (`red-blue`).
+  final String name;
 
-  String get label {
-    final raw = name;
-    if (raw == null || raw.isEmpty) return 'Juego $id';
-    return raw
-        .split('-')
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
-  }
+  String get label => name
+      .split('-')
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
 }
 
 class MoveGames {

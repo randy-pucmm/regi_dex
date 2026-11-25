@@ -1,112 +1,21 @@
-import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/core/database/app_database.dart';
-import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/features/pokemon/data/pokemon_detail_repository_impl.dart';
 import 'package:regi_dex/features/pokemon/domain/evolution_chain.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon_move.dart';
 
 import '../../../core/database/database_test_helpers.dart';
-import 'fake_pokemon_remote.dart';
-
-Map<String, dynamic> _response({
-  String effectEs = 'Sube el ataque.',
-  Map<String, dynamic>? chain,
-}) => {
-  'pokemon': [
-    {
-      'id': 1,
-      'pokemonspecy': {
-        'id': 1,
-        'evolutionchain': chain,
-        'pokemonspeciesnames': [
-          {
-            'name': 'Bulbasaur',
-            'genus': 'Pokémon Semilla',
-            'language': {'name': 'es'},
-          },
-        ],
-      },
-      'pokemonmoves': [
-        {
-          'move_id': 1,
-          'level': 5,
-          'move_learn_method_id': 1,
-          'version_group_id': 20,
-        },
-        {
-          'move_id': 2,
-          'level': null,
-          'move_learn_method_id': 4,
-          'version_group_id': 20,
-        },
-      ],
-      'pokemonabilities': [
-        {
-          'ability': {
-            'id': 65,
-            'abilitynames': [
-              {
-                'name': 'Espesura',
-                'language': {'name': 'es'},
-              },
-            ],
-            'abilityeffecttexts': [
-              {
-                'short_effect': 'Boosts attack.',
-                'language': {'name': 'en'},
-              },
-              {
-                'short_effect': effectEs,
-                'language': {'name': 'es'},
-              },
-            ],
-          },
-        },
-      ],
-    },
-  ],
-};
-
-Map<String, dynamic> _member(
-  int id,
-  String name, {
-  int? from,
-  List<Map<String, dynamic>> steps = const [],
-}) => {
-  'id': id,
-  'name': name,
-  'evolves_from_species_id': from,
-  'pokemonevolutions': steps,
-};
-
-Map<String, dynamic> _step({
-  int? level,
-  int? happiness,
-  String? time,
-  String trigger = 'level-up',
-  String? item,
-}) => {
-  'min_level': level,
-  'min_happiness': happiness,
-  'time_of_day': time,
-  'evolutiontrigger': {'name': trigger},
-  'item': item == null ? null : {'name': item},
-};
 
 void main() {
   late AppDatabase db;
-  late FakePokemonRemote remote;
   late PokemonDetailRepositoryImpl repository;
 
   setUp(() async {
     db = createTestDatabase();
-    remote = FakePokemonRemote();
     repository = PokemonDetailRepositoryImpl(
       catalog: db.catalogDao,
       reference: db.referenceDao,
-      remote: remote,
     );
     addTearDown(db.close);
     await seedReference(db);
@@ -114,13 +23,20 @@ void main() {
     await upsertBulbasaur(db);
   });
 
-  Future<void> saveBulbasaurMoves() => db.catalogDao.saveDetail(
-    pokemonId: 1,
-    speciesId: 1,
-    syncedAt: DateTime(2026, 11, 20),
-    abilities: const [],
-    moves: bulbasaurMoves(),
-  );
+  Future<void> saveMoves(
+    List<({int moveId, int versionGroupId, int methodId, int level})> moves,
+  ) => db.catalogDao.replacePokemonMoves(1, [
+    for (final m in moves)
+      PokemonMovesCompanion.insert(
+        pokemonId: 1,
+        moveId: m.moveId,
+        versionGroupId: m.versionGroupId,
+        learnMethodId: m.methodId,
+        level: Value(m.level),
+      ),
+  ]);
+
+  Future<void> saveBulbasaurMoves() => saveMoves(bulbasaurMoves());
 
   test('entrega tipos, stats y habilidades del Pokémon guardado', () async {
     final detail = (await repository.watchDetail(1).first)!;
@@ -156,74 +72,6 @@ void main() {
     expect(await repository.watchDetail(999).first, isNull);
   });
 
-  test('refreshDetail guarda nombre y efecto en español', () async {
-    remote.details[1] = _response();
-
-    await repository.refreshDetail(1);
-
-    final ability = (await repository.watchDetail(1).first)!.abilities.first;
-    expect(ability.nameEs, 'Espesura');
-    expect(ability.shortEffect, 'Sube el ataque.');
-    expect((await db.catalogDao.getPokemon(1))!.detailSyncedAt, isNotNull);
-  });
-
-  test('un detalle reciente no se vuelve a pedir', () async {
-    remote.details[1] = _response();
-
-    await repository.refreshDetail(1);
-    await repository.refreshDetail(1);
-
-    expect(remote.detailCalls, [1]);
-  });
-
-  test('un detalle reciente pero sin movimientos se vuelve a pedir', () async {
-    await db.catalogDao.saveDetail(
-      pokemonId: 1,
-      speciesId: 1,
-      syncedAt: DateTime.now(),
-      abilities: const [],
-      moves: const [],
-    );
-    remote.details[1] = _response();
-
-    await repository.refreshDetail(1);
-
-    expect(remote.detailCalls, [1]);
-    expect(await db.catalogDao.hasMoves(1), isTrue);
-  });
-
-  test('un detalle de hace más de una semana se vuelve a pedir', () async {
-    remote.details[1] = _response();
-    await repository.refreshDetail(1);
-
-    await withClock(
-      Clock.fixed(DateTime.now().add(const Duration(days: 8))),
-      () => repository.refreshDetail(1),
-    );
-
-    expect(remote.detailCalls, [1, 1]);
-  });
-
-  test('sin red falla y conserva lo local', () async {
-    await expectLater(
-      repository.refreshDetail(1),
-      throwsA(isA<NetworkFailure>()),
-    );
-
-    final detail = (await repository.watchDetail(1).first)!;
-    expect(detail.abilities.first.shortEffect, isNull);
-    expect((await db.catalogDao.getPokemon(1))!.detailSyncedAt, isNull);
-  });
-
-  test('una respuesta sin el Pokémon es un ValidationFailure', () async {
-    remote.details[1] = {'pokemon': <dynamic>[]};
-
-    await expectLater(
-      repository.refreshDetail(1),
-      throwsA(isA<ValidationFailure>()),
-    );
-  });
-
   Future<MovePage> moves(
     MoveMethod method, {
     int game = 20,
@@ -234,18 +82,6 @@ void main() {
   Future<List<String>> names(MoveMethod method, {required int game}) async => [
     for (final m in (await moves(method, game: game)).moves) m.name,
   ];
-
-  test('refreshDetail guarda los movimientos que aprende', () async {
-    remote.details[1] = _response();
-
-    await repository.refreshDetail(1);
-
-    final levelUp = await moves(MoveMethod.levelUp);
-    expect([for (final m in levelUp.moves) (m.name, m.level)], [('move-1', 5)]);
-    expect((await moves(MoveMethod.machine)).moves.map((m) => m.name), [
-      'move-2',
-    ]);
-  });
 
   test('entrega 10 movimientos por página, en orden de nivel', () async {
     await saveBulbasaurMoves();
@@ -308,19 +144,13 @@ void main() {
   });
 
   group('juegos', () {
-    Future<void> saveVenusaurLike() => db.catalogDao.saveDetail(
-      pokemonId: 1,
-      speciesId: 1,
-      syncedAt: DateTime(2026, 11, 20),
-      abilities: const [],
-      moves: const [
-        (moveId: 1, versionGroupId: 20, methodId: 1, level: 5),
-        (moveId: 2, versionGroupId: 10, methodId: 4, level: 0),
-        (moveId: 3, versionGroupId: 15, methodId: 4, level: 0),
-        (moveId: 4, versionGroupId: 15, methodId: 3, level: 0),
-        (moveId: 5, versionGroupId: 30, methodId: 12, level: 0),
-      ],
-    );
+    Future<void> saveVenusaurLike() => saveMoves(const [
+      (moveId: 1, versionGroupId: 20, methodId: 1, level: 5),
+      (moveId: 2, versionGroupId: 10, methodId: 4, level: 0),
+      (moveId: 3, versionGroupId: 15, methodId: 4, level: 0),
+      (moveId: 4, versionGroupId: 15, methodId: 3, level: 0),
+      (moveId: 5, versionGroupId: 30, methodId: 12, level: 0),
+    ]);
 
     test('lista los juegos del más reciente al más antiguo', () async {
       await saveVenusaurLike();
@@ -340,16 +170,10 @@ void main() {
     );
 
     test('sin movimientos por nivel usa el juego más reciente', () async {
-      await db.catalogDao.saveDetail(
-        pokemonId: 1,
-        speciesId: 1,
-        syncedAt: DateTime(2026, 11, 20),
-        abilities: const [],
-        moves: const [
-          (moveId: 2, versionGroupId: 10, methodId: 4, level: 0),
-          (moveId: 3, versionGroupId: 15, methodId: 4, level: 0),
-        ],
-      );
+      await saveMoves(const [
+        (moveId: 2, versionGroupId: 10, methodId: 4, level: 0),
+        (moveId: 3, versionGroupId: 15, methodId: 4, level: 0),
+      ]);
 
       expect((await repository.moveGames(1)).defaultId, 15);
     });
@@ -385,7 +209,7 @@ void main() {
       final games = (await repository.moveGames(1)).games;
 
       expect(games.firstWhere((g) => g.id == 20).label, 'Sword Shield');
-      expect(games.firstWhere((g) => g.id == 10).label, 'Juego 10');
+      expect(games.firstWhere((g) => g.id == 10).label, 'Group 10');
     });
 
     test('sin movimientos guardados no hay juegos', () async {
@@ -443,26 +267,41 @@ void main() {
   });
 
   group('evoluciones', () {
-    Future<void> chainSpecies(Map<int, String> names) async {
-      for (final entry in names.entries) {
-        await db.catalogDao.upsertSpecies(
-          SpeciesCompanion.insert(
-            id: Value(entry.key),
-            name: entry.value,
-            generationId: 1,
-            evolutionChainId: const Value(1),
-          ),
-        );
-      }
+    EvolutionsCompanion step(
+      int to,
+      String name, {
+      int? from,
+      String? trigger,
+      int? level,
+      int? happiness,
+      String? time,
+      String? item,
+    }) => EvolutionsCompanion.insert(
+      chainId: 1,
+      toSpeciesId: to,
+      toSpeciesName: name,
+      fromSpeciesId: Value(from),
+      trigger: Value(trigger),
+      minLevel: Value(level),
+      minHappiness: Value(happiness),
+      timeOfDay: Value(time),
+      item: Value(item),
+    );
+
+    Future<void> saveChain(List<EvolutionsCompanion> steps) async {
+      await db.catalogDao.upsertSpecies(
+        SpeciesCompanion.insert(
+          id: const Value(1),
+          name: 'bulbasaur',
+          generationId: 1,
+          evolutionChainId: const Value(1),
+        ),
+      );
+      await db.catalogDao.replaceEvolutionChain(1, steps);
     }
 
-    Future<EvolutionChain?> download(List<Map<String, dynamic>> members) async {
-      remote.details[1] = _response(
-        chain: {'id': 1, 'pokemonspecies': members},
-      );
-      await repository.refreshDetail(1);
-      return repository.watchEvolutions(1).first;
-    }
+    Future<EvolutionChain> chain() async =>
+        (await repository.watchEvolutions(1).first)!;
 
     List<(String, int, String)> flat(EvolutionChain chain) => [
       for (final (node, depth) in chain.flattened)
@@ -470,43 +309,38 @@ void main() {
     ];
 
     test('una línea de tres etapas sale como árbol con sus niveles', () async {
-      await chainSpecies({1: 'bulbasaur', 2: 'ivysaur', 3: 'venusaur'});
+      await saveChain([
+        step(1, 'bulbasaur'),
+        step(2, 'ivysaur', from: 1, trigger: 'level-up', level: 16, time: ''),
+        step(3, 'venusaur', from: 2, trigger: 'level-up', level: 32),
+      ]);
 
-      final chain = (await download([
-        _member(1, 'bulbasaur'),
-        _member(2, 'ivysaur', from: 1, steps: [_step(level: 16, time: '')]),
-        _member(3, 'venusaur', from: 2, steps: [_step(level: 32)]),
-      ]))!;
+      final result = await chain();
 
-      expect(flat(chain), [
+      expect(flat(result), [
         ('bulbasaur', 0, ''),
         ('ivysaur', 1, 'Nv. 16'),
         ('venusaur', 2, 'Nv. 32'),
       ]);
-      expect(chain.currentSpeciesId, 1);
-      expect(chain.evolves, isTrue);
+      expect(result.currentSpeciesId, 1);
+      expect(result.evolves, isTrue);
     });
 
     test('una cadena con ramas lista cada una con su condición', () async {
-      await chainSpecies({1: 'eevee', 2: 'flareon', 3: 'espeon'});
-
-      final chain = (await download([
-        _member(1, 'eevee'),
-        _member(
-          2,
-          'flareon',
-          from: 1,
-          steps: [_step(trigger: 'use-item', item: 'fire-stone')],
-        ),
-        _member(
+      await saveChain([
+        step(1, 'eevee'),
+        step(2, 'flareon', from: 1, trigger: 'use-item', item: 'fire-stone'),
+        step(
           3,
           'espeon',
           from: 1,
-          steps: [_step(happiness: 220, time: 'day')],
+          trigger: 'level-up',
+          happiness: 220,
+          time: 'day',
         ),
-      ]))!;
+      ]);
 
-      expect(flat(chain), [
+      expect(flat(await chain()), [
         ('eevee', 0, ''),
         ('flareon', 1, 'Usar fire stone'),
         ('espeon', 1, 'Felicidad 220 · de día'),
@@ -514,42 +348,24 @@ void main() {
     });
 
     test('una evolución con dos condiciones las junta con «o»', () async {
-      await chainSpecies({1: 'a', 2: 'b'});
+      await saveChain([
+        step(1, 'a'),
+        step(2, 'b', from: 1, trigger: 'level-up', level: 30),
+        step(2, 'b', from: 1, trigger: 'trade'),
+      ]);
 
-      final chain = (await download([
-        _member(1, 'a'),
-        _member(
-          2,
-          'b',
-          from: 1,
-          steps: [
-            _step(level: 30),
-            _step(trigger: 'trade'),
-          ],
-        ),
-      ]))!;
-
-      expect(flat(chain).last, ('b', 1, 'Nv. 30 o Intercambio'));
+      expect(flat(await chain()).last, ('b', 1, 'Nv. 30 o Intercambio'));
     });
 
     test('las condiciones repetidas se muestran una sola vez', () async {
-      await chainSpecies({1: 'eevee', 2: 'leafeon'});
+      await saveChain([
+        step(1, 'eevee'),
+        step(2, 'leafeon', from: 1, trigger: 'level-up'),
+        step(2, 'leafeon', from: 1, trigger: 'level-up'),
+        step(2, 'leafeon', from: 1, trigger: 'use-item', item: 'leaf-stone'),
+      ]);
 
-      final chain = (await download([
-        _member(1, 'eevee'),
-        _member(
-          2,
-          'leafeon',
-          from: 1,
-          steps: [
-            _step(),
-            _step(),
-            _step(trigger: 'use-item', item: 'leaf-stone'),
-          ],
-        ),
-      ]))!;
-
-      expect(flat(chain).last, (
+      expect(flat(await chain()).last, (
         'leafeon',
         1,
         'Subir de nivel o Usar leaf stone',
@@ -557,49 +373,22 @@ void main() {
     });
 
     test('una especie sin evoluciones no evoluciona', () async {
-      await chainSpecies({1: 'ditto'});
+      await saveChain([step(1, 'ditto')]);
 
-      final chain = (await download([_member(1, 'ditto')]))!;
-
-      expect(chain.evolves, isFalse);
+      expect((await chain()).evolves, isFalse);
     });
 
-    test('sin descargar, una cadena de varias especies emite null', () async {
-      await chainSpecies({1: 'bulbasaur', 2: 'ivysaur'});
-
-      expect(await repository.watchEvolutions(1).first, isNull);
-    });
-
-    test('volver a descargar reemplaza las condiciones anteriores', () async {
-      await chainSpecies({1: 'a', 2: 'b'});
-      await download([
-        _member(1, 'a'),
-        _member(2, 'b', from: 1, steps: [_step(level: 10)]),
-      ]);
-      await db.catalogDao.saveDetail(
-        pokemonId: 1,
-        speciesId: 1,
-        syncedAt: DateTime.now(),
-        abilities: const [],
-        moves: const [],
-        chainSpeciesIds: const [1, 2],
-        evolutions: const [
-          (
-            speciesId: 2,
-            fromSpeciesId: 1,
-            ordinal: 0,
-            trigger: 'level-up',
-            minLevel: 12,
-            minHappiness: null,
-            timeOfDay: null,
-            itemName: null,
-          ),
-        ],
+    test('sin descargar la cadena emite null', () async {
+      await db.catalogDao.upsertSpecies(
+        SpeciesCompanion.insert(
+          id: const Value(1),
+          name: 'bulbasaur',
+          generationId: 1,
+          evolutionChainId: const Value(1),
+        ),
       );
 
-      final chain = (await repository.watchEvolutions(1).first)!;
-
-      expect(flat(chain).last, ('b', 1, 'Nv. 12'));
+      expect(await repository.watchEvolutions(1).first, isNull);
     });
   });
 

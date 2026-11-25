@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Acceso a PokéAPI. Los manifiestos de debug y profile ya lo declaran;
+         sin esto, un APK de release no llega a la red. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="regi_dex"
         android:name="${applicationName}"

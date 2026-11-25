@@ -5,7 +5,8 @@ import '../tokens/regi_colors.dart';
 import 'hexagon_border.dart';
 
 /// Botón hexagonal para las ventanas oscuras. Con [selected] es una opción de
-/// un grupo (la elegida lleva «✓», no solo color); sin él, una acción.
+/// un grupo (la elegida lleva «✓», no solo color); sin él, una acción. Con
+/// [multiple] las opciones del grupo no son excluyentes (varias a la vez).
 class HexChoice extends StatelessWidget {
   const HexChoice({
     super.key,
@@ -14,6 +15,7 @@ class HexChoice extends StatelessWidget {
     this.selected,
     this.filled = false,
     this.leading,
+    this.multiple = false,
   });
 
   final String label;
@@ -25,6 +27,9 @@ class HexChoice extends StatelessWidget {
   /// La opción elegida se rellena de blanco.
   final bool filled;
   final Widget? leading;
+
+  /// Se pueden elegir varias opciones del grupo a la vez.
+  final bool multiple;
 
   static const _pointDepth = 16.0;
   static const unselectedBorder = Color(0xFF7C858B);
@@ -47,7 +52,7 @@ class HexChoice extends StatelessWidget {
       button: true,
       label: label,
       selected: selected,
-      inMutuallyExclusiveGroup: selected == null ? null : true,
+      inMutuallyExclusiveGroup: selected == null ? null : !multiple,
       excludeSemantics: true,
       onTap: onPressed,
       child: Material(

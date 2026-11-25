@@ -17,6 +17,46 @@ class FakePokemonRemote implements PokemonRemoteSource {
   /// Permite alterar la página antes de entregarla.
   void Function(Map<String, dynamic> page)? tamper;
 
+  /// Búsquedas pedidas con [searchPokemon], en orden: `nombre:x` o `numero:n`.
+  final searches = <String>[];
+
+  /// Ids que devuelve [searchPokemon] (el Pokémon sintético de cada id).
+  var searchResultIds = <int>[];
+
+  /// Falla [searchPokemon] con [NetworkFailure] mientras sea true.
+  var failSearch = false;
+
+  @override
+  Future<Map<String, dynamic>> searchPokemon({
+    String? name,
+    int? number,
+    int limit = PokemonRemoteSource.searchLimit,
+  }) async {
+    searches.add(name != null ? 'nombre:$name' : 'numero:$number');
+    if (failSearch) throw const NetworkFailure();
+    return {
+      'pokemon': [for (final id in searchResultIds) syntheticPokemon(id)],
+    };
+  }
+
+  /// Ids pedidos con [fetchDetail], en orden.
+  final detailIds = <int>[];
+
+  /// Falla [fetchDetail] con [NetworkFailure] mientras sea true.
+  var failDetail = false;
+
+  /// Permite alterar el detalle antes de entregarlo.
+  void Function(Map<String, dynamic> detail)? tamperDetail;
+
+  @override
+  Future<Map<String, dynamic>> fetchDetail(int id) async {
+    detailIds.add(id);
+    if (failDetail) throw const NetworkFailure();
+    final detail = syntheticDetail(id);
+    tamperDetail?.call(detail);
+    return detail;
+  }
+
   @override
   Future<Map<String, dynamic>> fetchReference() async {
     referenceCalls++;
@@ -33,15 +73,5 @@ class FakePokemonRemote implements PokemonRemoteSource {
     final page = syntheticPage(offset: offset, limit: limit, total: total);
     tamper?.call(page);
     return page;
-  }
-
-  /// Respuesta de GetPokemonDetail por id; null hace fallar la llamada.
-  final details = <int, Map<String, dynamic>>{};
-  final detailCalls = <int>[];
-
-  @override
-  Future<Map<String, dynamic>> fetchDetail(int id) async {
-    detailCalls.add(id);
-    return details[id] ?? (throw const NetworkFailure());
   }
 }

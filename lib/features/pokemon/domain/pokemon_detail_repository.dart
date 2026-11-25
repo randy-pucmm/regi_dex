@@ -7,11 +7,6 @@ abstract interface class PokemonDetailRepository {
   /// Detalle de [id] desde la base local; emite null si no está en el catálogo.
   Stream<PokemonDetail?> watchDetail(int id);
 
-  /// Descarga el detalle de [id] y lo guarda. No hace nada si ya se descargó
-  /// hace poco. Si falla lanza el `Failure` correspondiente y lo local queda
-  /// como estaba.
-  Future<void> refreshDetail(int id);
-
   /// Los juegos en los que [pokemonId] aprende movimientos y el que se
   /// muestra por defecto (el más reciente con movimientos por nivel).
   Future<MoveGames> moveGames(int pokemonId);

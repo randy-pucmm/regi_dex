@@ -112,3 +112,149 @@ Map<String, dynamic> syntheticPage({
     ],
   };
 }
+
+/// `data` de GetPokemonDetail para [id]: los mismos datos base que
+/// [syntheticPokemon] (mismo `content_hash`) más movimientos, sprites shiny,
+/// textos en español, una variante mega y una cadena evolutiva de dos pasos.
+Map<String, dynamic> syntheticDetail(int id) {
+  final light = syntheticPokemon(id);
+  final abilityId = id % syntheticAbilityCount + 1;
+  return {
+    'pokemon': [
+      {
+        'id': id,
+        'name': light['name'],
+        'height': light['height'],
+        'weight': light['weight'],
+        'is_default': true,
+        'pokemontypes': light['pokemontypes'],
+        'pokemonstats': light['pokemonstats'],
+        'pokemonabilities': [
+          {
+            'is_hidden': false,
+            'slot': 1,
+            'ability': {
+              'id': abilityId,
+              'name': 'ability-$abilityId',
+              'abilitynames': [
+                {
+                  'name': 'Habilidad $abilityId',
+                  'language': {'name': 'es'},
+                },
+              ],
+              'abilityeffecttexts': [
+                {
+                  'short_effect': 'Effect $abilityId',
+                  'language': {'name': 'en'},
+                },
+                {
+                  'short_effect': 'Efecto $abilityId',
+                  'language': {'name': 'es'},
+                },
+              ],
+            },
+          },
+        ],
+        'pokemonmoves': [
+          {
+            'move_id': 1,
+            'level': 5,
+            'move_learn_method_id': 1,
+            'version_group_id': 1,
+          },
+          {
+            'move_id': 1,
+            'level': 0,
+            'move_learn_method_id': 4,
+            'version_group_id': 1,
+          },
+          // Repetida: no debe romper la clave primaria.
+          {
+            'move_id': 1,
+            'level': 5,
+            'move_learn_method_id': 1,
+            'version_group_id': 1,
+          },
+        ],
+        'pokemonsprites': [
+          {
+            'front': 'https://img.test/$id.png',
+            'front_shiny': 'https://img.test/s/$id.png',
+            'artwork': 'https://img.test/a/$id.png',
+            'artwork_shiny': 'https://img.test/as/$id.png',
+          },
+        ],
+        'pokemonspecy': {
+          'id': id,
+          'name': 'species-$id',
+          'generation_id': 1,
+          'is_legendary': false,
+          'is_mythical': false,
+          'pokemonegggroups': [
+            {'egg_group_id': id % syntheticEggGroupCount + 1},
+          ],
+          'pokemonspeciesnames': [
+            {
+              'name': 'Especie $id',
+              'genus': 'Pokémon $id',
+              'language': {'name': 'es'},
+            },
+            {
+              'name': 'Species $id',
+              'genus': 'The $id Pokémon',
+              'language': {'name': 'en'},
+            },
+          ],
+          'pokemons': [
+            {
+              'id': id,
+              'name': 'pokemon-$id',
+              'is_default': true,
+              'pokemonforms': [
+                {'form_name': '', 'is_mega': false},
+              ],
+              'pokemontypes': light['pokemontypes'],
+            },
+            {
+              'id': 10000 + id,
+              'name': 'pokemon-$id-mega',
+              'is_default': false,
+              'pokemonforms': [
+                {'form_name': 'mega', 'is_mega': true},
+              ],
+              'pokemontypes': [
+                {'slot': 1, 'type_id': 1},
+                {'slot': 2, 'type_id': 2},
+              ],
+            },
+          ],
+          'evolutionchain': {
+            'id': id,
+            'pokemonspecies': [
+              {
+                'id': id,
+                'name': 'species-$id',
+                'evolves_from_species_id': null,
+                'pokemonevolutions': <dynamic>[],
+              },
+              {
+                'id': id + 1000,
+                'name': 'species-${id + 1000}',
+                'evolves_from_species_id': id,
+                'pokemonevolutions': [
+                  {
+                    'min_level': 16,
+                    'min_happiness': null,
+                    'time_of_day': '',
+                    'evolutiontrigger': {'name': 'level-up'},
+                    'item': null,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+}

@@ -55,6 +55,8 @@ class Pokemons extends Table {
   IntColumn get baseStatTotal => integer().withDefault(const Constant(0))();
   TextColumn get spriteUrl => text().nullable()();
   TextColumn get artworkUrl => text().nullable()();
+  TextColumn get spriteShinyUrl => text().nullable()();
+  TextColumn get artworkShinyUrl => text().nullable()();
   TextColumn get contentHash => text().nullable()();
   DateTimeColumn get lightSyncedAt => dateTime()();
   DateTimeColumn get detailSyncedAt => dateTime().nullable()();
@@ -105,19 +107,17 @@ class PokemonAbilities extends Table {
   Set<Column> get primaryKey => {pokemonId, slot};
 }
 
-/// Movimiento que un Pokémon aprende en un grupo de versiones. `moveId` y
-/// `versionGroupId` no son FK: los datos de referencia pueden llegar después.
-/// `methodId` es el de PokéAPI (1 nivel, 2 huevo, 3 tutor, 4 MT).
+/// Movimiento que aprende un Pokémon (detalle, D10). `learnMethodId` es el id de
+/// PokéAPI (sin tabla propia). `level` es 0 si el método no usa nivel.
 @DataClassName('PokemonMoveRow')
-@TableIndex(name: 'idx_pokemon_move_pokemon_id', columns: {#pokemonId})
 class PokemonMoves extends Table {
   @override
   String get tableName => 'pokemon_move';
 
   IntColumn get pokemonId => integer().references(Pokemons, #id)();
-  IntColumn get moveId => integer()();
-  IntColumn get versionGroupId => integer()();
-  IntColumn get methodId => integer()();
+  IntColumn get moveId => integer().references(Moves, #id)();
+  IntColumn get versionGroupId => integer().references(VersionGroups, #id)();
+  IntColumn get learnMethodId => integer()();
   IntColumn get level => integer().withDefault(const Constant(0))();
 
   @override
@@ -125,28 +125,51 @@ class PokemonMoves extends Table {
     pokemonId,
     moveId,
     versionGroupId,
-    methodId,
+    learnMethodId,
     level,
   };
 }
 
-/// Cómo evoluciona una especie desde otra. Una especie puede tener varias
-/// filas (una por condición alternativa); las condiciones vacías van en null.
-/// `speciesId` no es FK: el detalle puede llegar antes que toda la cadena.
-@DataClassName('SpeciesEvolutionRow')
-class SpeciesEvolutions extends Table {
+/// Un paso de una cadena evolutiva (detalle, D10). Sin FK a `species`: la
+/// especie puede no estar aún en el catálogo local. La especie base de la cadena
+/// llega con `fromSpeciesId` nulo y sin condiciones. Las filas se reemplazan por
+/// `chainId`; el orden de inserción es el orden de la cadena.
+@DataClassName('EvolutionRow')
+@TableIndex(name: 'idx_evolution_chain_id', columns: {#chainId})
+class Evolutions extends Table {
   @override
-  String get tableName => 'species_evolution';
+  String get tableName => 'evolution';
 
-  IntColumn get speciesId => integer()();
-  IntColumn get ordinal => integer()();
-  IntColumn get evolvesFromSpeciesId => integer()();
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get chainId => integer()();
+  IntColumn get fromSpeciesId => integer().nullable()();
+  IntColumn get toSpeciesId => integer()();
+  TextColumn get toSpeciesName => text()();
   TextColumn get trigger => text().nullable()();
   IntColumn get minLevel => integer().nullable()();
   IntColumn get minHappiness => integer().nullable()();
   TextColumn get timeOfDay => text().nullable()();
-  TextColumn get itemName => text().nullable()();
+  TextColumn get item => text().nullable()();
+}
+
+/// Variante o forma de una especie (detalle, RF-DET-08). `pokemonId` es el id de
+/// PokéAPI de la variante, que puede no existir en `pokemon` (el catálogo solo
+/// guarda las predeterminadas); por eso no es FK.
+@DataClassName('PokemonFormRow')
+@TableIndex(name: 'idx_pokemon_form_species_id', columns: {#speciesId})
+class PokemonForms extends Table {
+  @override
+  String get tableName => 'pokemon_form';
+
+  IntColumn get pokemonId => integer()();
+  IntColumn get speciesId => integer().references(Species, #id)();
+  TextColumn get name => text()();
+  TextColumn get formName => text().nullable()();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
+  BoolColumn get isMega => boolean().withDefault(const Constant(false))();
+  IntColumn get type1Id => integer().nullable()();
+  IntColumn get type2Id => integer().nullable()();
 
   @override
-  Set<Column> get primaryKey => {speciesId, ordinal};
+  Set<Column> get primaryKey => {pokemonId};
 }

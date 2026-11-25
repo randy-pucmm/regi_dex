@@ -69,10 +69,14 @@ class CatalogSync {
     }
   }
 
-  /// Sincroniza la referencia si no se hizo en los últimos [referenceMaxAge].
-  /// El catálogo la necesita primero por las claves foráneas.
+  /// Sincroniza la referencia si no se hizo en los últimos [referenceMaxAge] o
+  /// si falta el total de Pokémon. El catálogo la necesita primero por las
+  /// claves foráneas.
   Future<void> _ensureReference() async {
-    if (await _local.isReferenceFresh(referenceKey, referenceMaxAge)) return;
+    if (await _local.isReferenceFresh(referenceKey, referenceMaxAge) &&
+        await _local.hasCatalogTotal()) {
+      return;
+    }
     await _coordinator.run<void>(referenceKey, () async {
       final data = await _remote.fetchReference();
       await _local.saveReference(await _mapReference(_offload, data));

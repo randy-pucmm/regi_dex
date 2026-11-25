@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
+import 'package:regi_dex/features/pokemon/domain/pokemon_query.dart';
 import 'package:regi_dex/features/pokemon/presentation/catalog_state.dart';
 
 const _regirock = Pokemon(
@@ -16,7 +17,15 @@ CatalogState _state({
   AsyncValue<List<Pokemon>> pokemon = const AsyncData([]),
   SyncStatus sync = SyncStatus.inactiva,
   ServiceStatus service = ServiceStatus.online,
-}) => catalogStateOf(pokemon: pokemon, sync: sync, service: service);
+  PokemonQuery query = const PokemonQuery(),
+  bool searchingRemote = false,
+}) => catalogStateOf(
+  pokemon: pokemon,
+  sync: sync,
+  service: service,
+  query: query,
+  searchingRemote: searchingRemote,
+);
 
 void main() {
   test('con datos los muestra, aunque la sync siga o haya fallado', () {
@@ -63,5 +72,142 @@ void main() {
       _state(sync: SyncStatus.fallida, service: ServiceStatus.offline),
       isA<CatalogEmpty>(),
     );
+  });
+
+  group('con una búsqueda', () {
+    const query = PokemonQuery(search: ' mew ');
+
+    test('sin coincidencias es «sin resultados», con el texto recortado', () {
+      final state = _state(query: query);
+
+      expect(state, isA<CatalogNoResults>());
+      final noResults = state as CatalogNoResults;
+      expect(noResults.search, 'mew');
+      expect(noResults.searching, isFalse);
+      expect(noResults.offline, isFalse);
+    });
+
+    test('no depende de la sync: aunque haya fallado sigue sin resultados', () {
+      for (final sync in [
+        SyncStatus.inactiva,
+        SyncStatus.completada,
+        SyncStatus.fallida,
+        SyncStatus.esperandoReintento,
+      ]) {
+        expect(
+          _state(query: query, sync: sync),
+          isA<CatalogNoResults>(),
+          reason: '$sync',
+        );
+      }
+      expect(
+        _state(query: query, service: ServiceStatus.servicioNoDisponible),
+        isA<CatalogNoResults>(),
+      );
+    });
+
+    test('mientras se consulta PokéAPI o se descarga el catálogo, busca', () {
+      expect(
+        (_state(
+          query: query,
+          searchingRemote: true,
+        ) as CatalogNoResults).searching,
+        isTrue,
+      );
+      expect(
+        (_state(
+          query: query,
+          sync: SyncStatus.sincronizando,
+        ) as CatalogNoResults).searching,
+        isTrue,
+      );
+    });
+
+    test('sin conexión lo avisa', () {
+      final state = _state(query: query, service: ServiceStatus.offline);
+
+      expect((state as CatalogNoResults).offline, isTrue);
+    });
+
+    test('con coincidencias muestra la lista', () {
+      expect(
+        _state(query: query, pokemon: const AsyncData([_regirock])),
+        isA<CatalogLoaded>(),
+      );
+    });
+
+    test('una búsqueda en blanco no cuenta como búsqueda', () {
+      expect(
+        _state(
+          query: const PokemonQuery(search: '  '),
+          service: ServiceStatus.offline,
+        ),
+        isA<CatalogEmpty>(),
+      );
+    });
+
+    test('mientras llega la lista sigue cargando', () {
+      expect(
+        _state(query: query, pokemon: const AsyncLoading()),
+        isA<CatalogLoading>(),
+      );
+    });
+  });
+
+  group('con filtros', () {
+    const filtered = PokemonQuery(types: {6});
+
+    test('sin coincidencias es «sin resultados», sin texto de búsqueda', () {
+      final state = _state(query: filtered);
+
+      expect(state, isA<CatalogNoResults>());
+      final noResults = state as CatalogNoResults;
+      expect(noResults.search, '');
+      expect(noResults.filtered, isTrue);
+      expect(noResults.searching, isFalse);
+    });
+
+    test('con búsqueda y filtros conserva ambos datos', () {
+      final state = _state(
+        query: const PokemonQuery(search: 'reg', types: {6}),
+      );
+
+      expect((state as CatalogNoResults).search, 'reg');
+      expect(state.filtered, isTrue);
+    });
+
+    test('una búsqueda sin filtros no marca «filtrado»', () {
+      final state = _state(query: const PokemonQuery(search: 'reg'));
+
+      expect((state as CatalogNoResults).filtered, isFalse);
+    });
+
+    test('no depende de la sync ni de la conexión', () {
+      expect(
+        _state(
+          query: filtered,
+          sync: SyncStatus.fallida,
+          service: ServiceStatus.servicioNoDisponible,
+        ),
+        isA<CatalogNoResults>(),
+      );
+    });
+
+    test('con coincidencias muestra la lista', () {
+      expect(
+        _state(query: filtered, pokemon: const AsyncData([_regirock])),
+        isA<CatalogLoaded>(),
+      );
+    });
+
+    test('solo cambiar el orden no cuenta como filtro', () {
+      expect(
+        _state(
+          query: const PokemonQuery(sort: PokemonSort.name),
+          service: ServiceStatus.offline,
+        ),
+        isA<CatalogEmpty>(),
+      );
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/core/database/app_database.dart';
+import 'package:regi_dex/core/database/daos/catalog_dao.dart';
 
 import 'database_test_helpers.dart';
 
@@ -168,6 +169,83 @@ void main() {
 
       await upsertBulbasaur(db, types: const [(slot: 1, typeId: 12)]);
       await expectation;
+    });
+  });
+
+  group('watchPokemonWithTypes con criterios', () {
+    Future<List<int>> idsFor(CatalogCriteria criteria) async => [
+      for (final item
+          in await db.catalogDao.watchPokemonWithTypes(criteria).first)
+        item.pokemon.id,
+    ];
+
+    setUp(() => seedSearchCatalog(db));
+
+    test('sin criterios devuelve todo por número', () async {
+      expect(await idsFor(const CatalogCriteria()), [25, 26, 233, 377, 378]);
+    });
+
+    test('por número nacional exacto', () async {
+      expect(await idsFor(const CatalogCriteria(number: 377)), [377]);
+      expect(await idsFor(const CatalogCriteria(number: 378)), [378]);
+      expect(await idsFor(const CatalogCriteria(number: 3)), isEmpty);
+    });
+
+    test('por trozo del nombre, sin distinguir mayúsculas', () async {
+      expect(await idsFor(const CatalogCriteria(namePart: 'pika')), [25]);
+      expect(await idsFor(const CatalogCriteria(namePart: 'chu')), [25, 26]);
+      expect(await idsFor(const CatalogCriteria(namePart: 'reg')), [377, 378]);
+    });
+
+    test('el nombre guardado con mayúsculas también se encuentra', () async {
+      await upsertBulbasaur(db);
+
+      expect(await idsFor(const CatalogCriteria(namePart: 'bulba')), [1]);
+    });
+
+    test('% y _ se buscan tal cual, no como comodines', () async {
+      expect(await idsFor(const CatalogCriteria(namePart: '%')), isEmpty);
+      expect(await idsFor(const CatalogCriteria(namePart: '_')), isEmpty);
+    });
+
+    test('número y nombre juntos deben cumplirse a la vez', () async {
+      expect(
+        await idsFor(const CatalogCriteria(number: 25, namePart: 'pika')),
+        [25],
+      );
+      expect(
+        await idsFor(const CatalogCriteria(number: 26, namePart: 'pika')),
+        isEmpty,
+      );
+    });
+
+    test('mantiene los tipos de los resultados', () async {
+      await upsertSimplePokemon(db, 400, 'pikablue', typeId: 4);
+
+      final items = await db.catalogDao
+          .watchPokemonWithTypes(const CatalogCriteria(namePart: 'pika'))
+          .first;
+
+      expect(items.map((i) => i.types.map((t) => t.id).toList()), [
+        [12],
+        [4],
+      ]);
+    });
+
+    test('emite de nuevo al llegar un Pokémon que coincide', () async {
+      final stream = db.catalogDao.watchPokemonWithTypes(
+        const CatalogCriteria(namePart: 'zap'),
+      );
+      final emissions = expectLater(
+        stream.map((items) => items.map((i) => i.pokemon.id).toList()),
+        emitsInOrder([
+          isEmpty,
+          [145],
+        ]),
+      );
+
+      await upsertSimplePokemon(db, 145, 'zapdos');
+      await emissions;
     });
   });
 

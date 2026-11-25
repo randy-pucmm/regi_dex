@@ -28,13 +28,72 @@ typedef PokemonMoveEntry = ({
   int level,
 });
 
-/// La cadena evolutiva de un Pokémon: sus especies con el sprite del Pokémon
-/// por defecto y las condiciones de cada evolución.
+/// La cadena evolutiva de un Pokémon: sus pasos y, por especie, el nombre en
+/// español y el sprite del Pokémon por defecto.
 typedef EvolutionRows = ({
   int currentSpeciesId,
-  List<({SpeciesRow species, String? spriteUrl})> members,
-  List<SpeciesEvolutionRow> evolutions,
+  List<EvolutionRow> steps,
+  Map<int, ({String? nameEs, String? spriteUrl})> species,
 });
+
+/// Campo por el que se ordena el catálogo.
+enum CatalogOrder { number, name, baseTotal }
+
+/// Qué Pokémon del catálogo se piden y en qué orden. Sin campos devuelve todos
+/// por número. Cada conjunto de ids filtra una categoría (basta uno de sus
+/// valores) y las categorías se combinan con Y.
+class CatalogCriteria {
+  const CatalogCriteria({
+    this.number,
+    this.namePart,
+    this.typeIds = const {},
+    this.generationIds = const {},
+    this.eggGroupIds = const {},
+    this.abilityIds = const {},
+    this.order = CatalogOrder.number,
+    this.descending = false,
+  });
+
+  /// Número nacional exacto.
+  final int? number;
+
+  /// Trozo del nombre, sin distinguir mayúsculas.
+  final String? namePart;
+
+  final Set<int> typeIds;
+  final Set<int> generationIds;
+  final Set<int> eggGroupIds;
+  final Set<int> abilityIds;
+  final CatalogOrder order;
+  final bool descending;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CatalogCriteria &&
+      other.number == number &&
+      other.namePart == namePart &&
+      _same(other.typeIds, typeIds) &&
+      _same(other.generationIds, generationIds) &&
+      _same(other.eggGroupIds, eggGroupIds) &&
+      _same(other.abilityIds, abilityIds) &&
+      other.order == order &&
+      other.descending == descending;
+
+  @override
+  int get hashCode => Object.hash(
+    number,
+    namePart,
+    Object.hashAllUnordered(typeIds),
+    Object.hashAllUnordered(generationIds),
+    Object.hashAllUnordered(eggGroupIds),
+    Object.hashAllUnordered(abilityIds),
+    order,
+    descending,
+  );
+
+  static bool _same(Set<int> a, Set<int> b) =>
+      a.length == b.length && a.containsAll(b);
+}
 
 /// Acceso al catálogo de Pokémon y a sus tablas de relación.
 @DriftAccessor(
@@ -46,7 +105,8 @@ typedef EvolutionRows = ({
     PokemonStats,
     PokemonAbilities,
     PokemonMoves,
-    SpeciesEvolutions,
+    Evolutions,
+    PokemonForms,
   ],
 )
 class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
@@ -56,23 +116,40 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   Stream<List<PokemonRow>> watchAllPokemon() =>
       (select(pokemons)..orderBy([(p) => OrderingTerm.asc(p.id)])).watch();
 
-  /// Todos los Pokémon por id, cada uno con sus tipos por slot (uno o dos; la
-  /// lista queda vacía si aún no tiene). Es una sola consulta con join: vuelve
-  /// a emitir cuando cambia el catálogo o la tabla de tipos, y como cada lote
-  /// de la sincronización es una transacción, emite una vez por lote.
-  Stream<List<PokemonWithTypes>> watchPokemonWithTypes() {
+  /// Los Pokémon que cumplen [criteria] (todos si está vacía) en el orden
+  /// pedido, cada uno con sus tipos por slot (uno o dos; la lista queda vacía
+  /// si aún no tiene). Es una sola consulta con join: vuelve a emitir cuando
+  /// cambia el catálogo o la tabla de tipos, y como cada lote de la
+  /// sincronización es una transacción, emite una vez por lote.
+  ///
+  /// El nombre se busca con `instr` sobre el nombre en minúsculas («contiene»,
+  /// sin comodines que escapar). Los filtros por tipo, generación, grupo huevo
+  /// y habilidad usan `EXISTS` sobre las tablas puente: así el join de tipos
+  /// solo sirve para mostrar y no recorta el segundo tipo de cada Pokémon. Se
+  /// ordena por el campo pedido, luego por id y por slot, de modo que las filas
+  /// de un mismo Pokémon quedan juntas.
+  Stream<List<PokemonWithTypes>> watchPokemonWithTypes([
+    CatalogCriteria criteria = const CatalogCriteria(),
+  ]) {
     final typeTable = attachedDatabase.types;
     final query =
         select(pokemons).join([
-          leftOuterJoin(
-            pokemonTypes,
-            pokemonTypes.pokemonId.equalsExp(pokemons.id),
-          ),
-          leftOuterJoin(typeTable, typeTable.id.equalsExp(pokemonTypes.typeId)),
-        ])..orderBy([
-          OrderingTerm.asc(pokemons.id),
-          OrderingTerm.asc(pokemonTypes.slot),
-        ]);
+            leftOuterJoin(
+              pokemonTypes,
+              pokemonTypes.pokemonId.equalsExp(pokemons.id),
+            ),
+            leftOuterJoin(
+              typeTable,
+              typeTable.id.equalsExp(pokemonTypes.typeId),
+            ),
+          ])
+          ..where(_matches(criteria))
+          ..orderBy([
+            _primaryOrder(criteria),
+            if (criteria.order != CatalogOrder.number)
+              OrderingTerm.asc(pokemons.id),
+            OrderingTerm.asc(pokemonTypes.slot),
+          ]);
 
     return query.watch().map((rows) {
       final result = <PokemonWithTypes>[];
@@ -86,6 +163,191 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         }
       }
       return result;
+    });
+  }
+
+  /// Primer criterio de orden de [criteria].
+  OrderingTerm _primaryOrder(CatalogCriteria criteria) {
+    final mode = criteria.descending ? OrderingMode.desc : OrderingMode.asc;
+    return switch (criteria.order) {
+      CatalogOrder.number => OrderingTerm(expression: pokemons.id, mode: mode),
+      CatalogOrder.name => OrderingTerm(
+        expression: pokemons.name.collate(Collate.noCase),
+        mode: mode,
+      ),
+      CatalogOrder.baseTotal => OrderingTerm(
+        expression: pokemons.baseStatTotal,
+        mode: mode,
+      ),
+    };
+  }
+
+  /// Condición de [criteria] sobre `pokemon`; verdadera si no pide nada.
+  Expression<bool> _matches(CatalogCriteria criteria) {
+    Expression<bool> where = const Constant(true);
+    final number = criteria.number;
+    if (number != null) where = where & pokemons.id.equals(number);
+    final namePart = criteria.namePart;
+    if (namePart != null) {
+      where =
+          where &
+          FunctionCallExpression<int>('instr', [
+            pokemons.name.lower(),
+            Variable<String>(namePart),
+          ]).isBiggerThanValue(0);
+    }
+    if (criteria.typeIds.isNotEmpty) {
+      final pt = pokemonTypes.createAlias('pt');
+      where =
+          where &
+          existsQuery(
+            selectOnly(pt)
+              ..addColumns([pt.pokemonId])
+              ..where(
+                pt.pokemonId.equalsExp(pokemons.id) &
+                    pt.typeId.isIn(criteria.typeIds),
+              ),
+          );
+    }
+    if (criteria.generationIds.isNotEmpty) {
+      final sp = species.createAlias('sp');
+      where =
+          where &
+          existsQuery(
+            selectOnly(sp)
+              ..addColumns([sp.id])
+              ..where(
+                sp.id.equalsExp(pokemons.speciesId) &
+                    sp.generationId.isIn(criteria.generationIds),
+              ),
+          );
+    }
+    if (criteria.eggGroupIds.isNotEmpty) {
+      final eg = speciesEggGroups.createAlias('eg');
+      where =
+          where &
+          existsQuery(
+            selectOnly(eg)
+              ..addColumns([eg.speciesId])
+              ..where(
+                eg.speciesId.equalsExp(pokemons.speciesId) &
+                    eg.eggGroupId.isIn(criteria.eggGroupIds),
+              ),
+          );
+    }
+    if (criteria.abilityIds.isNotEmpty) {
+      final pa = pokemonAbilities.createAlias('pa');
+      where =
+          where &
+          existsQuery(
+            selectOnly(pa)
+              ..addColumns([pa.pokemonId])
+              ..where(
+                pa.pokemonId.equalsExp(pokemons.id) &
+                    pa.abilityId.isIn(criteria.abilityIds),
+              ),
+          );
+    }
+    return where;
+  }
+
+  /// Cantidad de Pokémon del catálogo, como flujo.
+  Stream<int> watchPokemonCount() {
+    final count = pokemons.id.count();
+    return (selectOnly(
+      pokemons,
+    )..addColumns([count])).map((row) => row.read(count)!).watchSingle();
+  }
+
+  /// Cantidad de Pokémon del catálogo.
+  Future<int> countPokemon() => watchPokemonCount().first;
+
+  /// Pokémon por id, o null si no está en el catálogo.
+  Future<PokemonRow?> getPokemon(int id) =>
+      (select(pokemons)..where((p) => p.id.equals(id))).getSingleOrNull();
+
+  /// Inserta o actualiza una especie por su id.
+  Future<void> upsertSpecies(SpeciesCompanion row) =>
+      into(species).insertOnConflictUpdate(row);
+
+  /// Reemplaza en una transacción los grupos huevo de [speciesId].
+  Future<void> replaceSpeciesEggGroups(int speciesId, List<int> eggGroupIds) {
+    return transaction(() async {
+      await (delete(
+        speciesEggGroups,
+      )..where((t) => t.speciesId.equals(speciesId))).go();
+      await batch(
+        (b) => b.insertAll(speciesEggGroups, [
+          for (final id in eggGroupIds)
+            SpeciesEggGroupsCompanion.insert(
+              speciesId: speciesId,
+              eggGroupId: id,
+            ),
+        ]),
+      );
+    });
+  }
+
+  /// Tipos de [pokemonId] por slot.
+  Future<List<PokemonTypeRow>> typesOf(int pokemonId) =>
+      (select(pokemonTypes)
+            ..where((t) => t.pokemonId.equals(pokemonId))
+            ..orderBy([(t) => OrderingTerm.asc(t.slot)]))
+          .get();
+
+  /// Estadísticas base de [pokemonId] por id de stat.
+  Future<List<PokemonStatRow>> statsOf(int pokemonId) =>
+      (select(pokemonStats)
+            ..where((t) => t.pokemonId.equals(pokemonId))
+            ..orderBy([(t) => OrderingTerm.asc(t.statId)]))
+          .get();
+
+  /// Habilidades de [pokemonId] por slot.
+  Future<List<PokemonAbilityRow>> abilitiesOf(int pokemonId) =>
+      (select(pokemonAbilities)
+            ..where((t) => t.pokemonId.equals(pokemonId))
+            ..orderBy([(t) => OrderingTerm.asc(t.slot)]))
+          .get();
+
+  /// Inserta o actualiza habilidades por id; solo cambia las columnas con valor.
+  Future<void> upsertAbilities(List<AbilitiesCompanion> rows) => batch(
+    (b) => b.insertAllOnConflictUpdate(attachedDatabase.abilities, rows),
+  );
+
+  /// Reemplaza los movimientos de [pokemonId] por [rows].
+  Future<void> replacePokemonMoves(
+    int pokemonId,
+    List<PokemonMovesCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(
+        pokemonMoves,
+      )..where((t) => t.pokemonId.equals(pokemonId))).go();
+      await batch((b) => b.insertAll(pokemonMoves, rows));
+    });
+  }
+
+  /// Reemplaza las variantes de [speciesId] por [rows].
+  Future<void> replaceSpeciesForms(
+    int speciesId,
+    List<PokemonFormsCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(
+        pokemonForms,
+      )..where((t) => t.speciesId.equals(speciesId))).go();
+      await batch((b) => b.insertAll(pokemonForms, rows));
+    });
+  }
+
+  /// Reemplaza la cadena evolutiva [chainId] por [rows], en su orden.
+  Future<void> replaceEvolutionChain(
+    int chainId,
+    List<EvolutionsCompanion> rows,
+  ) {
+    return transaction(() async {
+      await (delete(evolutions)..where((t) => t.chainId.equals(chainId))).go();
+      await batch((b) => b.insertAll(evolutions, rows));
     });
   }
 
@@ -137,91 +399,9 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         });
   }
 
-  /// Guarda lo del detalle en una transacción y marca el Pokémon como
-  /// sincronizado en [syncedAt].
-  Future<void> saveDetail({
-    required int pokemonId,
-    required int speciesId,
-    required DateTime syncedAt,
-    required List<({int id, String? nameEs, String? shortEffect})> abilities,
-    required List<({int moveId, int versionGroupId, int methodId, int level})>
-    moves,
-    List<int> chainSpeciesIds = const [],
-    List<
-          ({
-            int speciesId,
-            int fromSpeciesId,
-            int ordinal,
-            String? trigger,
-            int? minLevel,
-            int? minHappiness,
-            String? timeOfDay,
-            String? itemName,
-          })
-        >
-        evolutions =
-        const [],
-    String? speciesNameEs,
-    String? genusEs,
-  }) => transaction(() async {
-    final abilityTable = attachedDatabase.abilities;
-    for (final a in abilities) {
-      await (update(abilityTable)..where((t) => t.id.equals(a.id))).write(
-        AbilitiesCompanion(
-          nameEs: Value(a.nameEs),
-          shortEffect: Value(a.shortEffect),
-        ),
-      );
-    }
-    await (delete(
-      pokemonMoves,
-    )..where((m) => m.pokemonId.equals(pokemonId))).go();
-    await batch(
-      (b) => b.insertAll(pokemonMoves, [
-        for (final m in moves)
-          PokemonMovesCompanion.insert(
-            pokemonId: pokemonId,
-            moveId: m.moveId,
-            versionGroupId: m.versionGroupId,
-            methodId: m.methodId,
-            level: Value(m.level),
-          ),
-      ], mode: InsertMode.insertOrIgnore),
-    );
-    if (chainSpeciesIds.isNotEmpty) {
-      await (delete(
-        speciesEvolutions,
-      )..where((e) => e.speciesId.isIn(chainSpeciesIds))).go();
-      await batch(
-        (b) => b.insertAll(speciesEvolutions, [
-          for (final e in evolutions)
-            SpeciesEvolutionsCompanion.insert(
-              speciesId: e.speciesId,
-              ordinal: e.ordinal,
-              evolvesFromSpeciesId: e.fromSpeciesId,
-              trigger: Value(e.trigger),
-              minLevel: Value(e.minLevel),
-              minHappiness: Value(e.minHappiness),
-              timeOfDay: Value(e.timeOfDay),
-              itemName: Value(e.itemName),
-            ),
-        ]),
-      );
-    }
-    await (update(species)..where((s) => s.id.equals(speciesId))).write(
-      SpeciesCompanion(nameEs: Value(speciesNameEs), genusEs: Value(genusEs)),
-    );
-    await (update(pokemons)..where((p) => p.id.equals(pokemonId))).write(
-      PokemonsCompanion(detailSyncedAt: Value(syncedAt)),
-    );
-  });
-
-  /// La cadena evolutiva de [pokemonId]; null si no está o no sabe su cadena.
-  /// Vuelve a emitir cuando se guardan evoluciones.
+  /// La cadena evolutiva de [pokemonId]; null si no está o no se descargó.
   Stream<EvolutionRows?> watchEvolutions(int pokemonId) =>
-      select(speciesEvolutions)
-          .watch()
-          .asyncMap((_) => _evolutionRows(pokemonId));
+      select(evolutions).watch().asyncMap((_) => _evolutionRows(pokemonId));
 
   Future<EvolutionRows?> _evolutionRows(int pokemonId) async {
     final pokemon = await getPokemon(pokemonId);
@@ -232,39 +412,27 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
     final chainId = current?.evolutionChainId;
     if (chainId == null) return null;
 
-    final members =
-        await (select(species)
-              ..where((s) => s.evolutionChainId.equals(chainId))
-              ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+    final steps =
+        await (select(evolutions)
+              ..where((e) => e.chainId.equals(chainId))
+              ..orderBy([(e) => OrderingTerm.asc(e.id)]))
             .get();
-    final ids = [for (final m in members) m.id];
+    if (steps.isEmpty) return null;
+    final ids = {for (final e in steps) e.toSpeciesId};
+    final names = await (select(species)..where((s) => s.id.isIn(ids))).get();
     final defaults = await (select(
       pokemons,
     )..where((p) => p.speciesId.isIn(ids) & p.isDefault.equals(true))).get();
+    final nameEs = {for (final n in names) n.id: n.nameEs};
     final sprites = {for (final p in defaults) p.speciesId: p.spriteUrl};
-    final evolutions =
-        await (select(speciesEvolutions)
-              ..where((e) => e.speciesId.isIn(ids))
-              ..orderBy([
-                (e) => OrderingTerm.asc(e.speciesId),
-                (e) => OrderingTerm.asc(e.ordinal),
-              ]))
-            .get();
     return (
       currentSpeciesId: pokemon.speciesId,
-      members: [
-        for (final m in members) (species: m, spriteUrl: sprites[m.id]),
-      ],
-      evolutions: evolutions,
+      steps: steps,
+      species: {
+        for (final id in ids) id: (nameEs: nameEs[id], spriteUrl: sprites[id]),
+      },
     );
   }
-
-  Future<bool> hasMoves(int pokemonId) async =>
-      (await (select(pokemonMoves)
-                ..where((m) => m.pokemonId.equals(pokemonId))
-                ..limit(1))
-              .get())
-          .isNotEmpty;
 
   /// Condición de las filas de [pokemonId] en [versionGroupId], de
   /// [methodId] o de cualquier método si es null.
@@ -273,15 +441,15 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
       pokemonMoves.versionGroupId.equals(versionGroupId) &
       (methodId == null
           ? const Constant(true)
-          : pokemonMoves.methodId.equals(methodId));
+          : pokemonMoves.learnMethodId.equals(methodId));
 
   /// Juegos (grupos de versiones) en los que [pokemonId] aprende movimientos,
-  /// del más reciente al más antiguo, con su nombre si la referencia lo tiene.
-  Future<List<({int id, String? name})>> getMoveGames(int pokemonId) async {
+  /// del más reciente al más antiguo, con su nombre.
+  Future<List<({int id, String name})>> getMoveGames(int pokemonId) async {
     final versionGroups = attachedDatabase.versionGroups;
     final query =
         selectOnly(pokemonMoves).join([
-            leftOuterJoin(
+            innerJoin(
               versionGroups,
               versionGroups.id.equalsExp(pokemonMoves.versionGroupId),
             ),
@@ -294,7 +462,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         .map(
           (row) => (
             id: row.read(pokemonMoves.versionGroupId)!,
-            name: row.read(versionGroups.name),
+            name: row.read(versionGroups.name)!,
           ),
         )
         .get();
@@ -312,7 +480,9 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
             .getSingle();
 
     final ofPokemon = pokemonMoves.pokemonId.equals(pokemonId);
-    return await latestWhere(ofPokemon & pokemonMoves.methodId.equals(1)) ??
+    return await latestWhere(
+          ofPokemon & pokemonMoves.learnMethodId.equals(1),
+        ) ??
         await latestWhere(ofPokemon);
   }
 
@@ -368,43 +538,6 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
         level: row.read(pokemonMoves.level)!,
       );
     }).get();
-  }
-
-  /// Cantidad de Pokémon del catálogo, como flujo.
-  Stream<int> watchPokemonCount() {
-    final count = pokemons.id.count();
-    return (selectOnly(
-      pokemons,
-    )..addColumns([count])).map((row) => row.read(count)!).watchSingle();
-  }
-
-  /// Cantidad de Pokémon del catálogo.
-  Future<int> countPokemon() => watchPokemonCount().first;
-
-  /// Pokémon por id, o null si no está en el catálogo.
-  Future<PokemonRow?> getPokemon(int id) =>
-      (select(pokemons)..where((p) => p.id.equals(id))).getSingleOrNull();
-
-  /// Inserta o actualiza una especie por su id.
-  Future<void> upsertSpecies(SpeciesCompanion row) =>
-      into(species).insertOnConflictUpdate(row);
-
-  /// Reemplaza en una transacción los grupos huevo de [speciesId].
-  Future<void> replaceSpeciesEggGroups(int speciesId, List<int> eggGroupIds) {
-    return transaction(() async {
-      await (delete(
-        speciesEggGroups,
-      )..where((t) => t.speciesId.equals(speciesId))).go();
-      await batch(
-        (b) => b.insertAll(speciesEggGroups, [
-          for (final id in eggGroupIds)
-            SpeciesEggGroupsCompanion.insert(
-              speciesId: speciesId,
-              eggGroupId: id,
-            ),
-        ]),
-      );
-    });
   }
 
   /// Inserta o actualiza [pokemon] y reemplaza sus tipos, stats y habilidades
