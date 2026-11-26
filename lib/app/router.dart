@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/favorites/presentation/favorites_page.dart';
+import '../features/pokemon/domain/pokemon.dart';
 import '../features/pokemon/presentation/catalog_page.dart';
 import '../features/pokemon/presentation/pokemon_detail_page.dart';
 import '../features/team_builder/presentation/team_builder_page.dart';
@@ -28,8 +29,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.pokemonPattern,
-            builder: (context, state) =>
-                PokemonDetailPage(id: int.parse(state.pathParameters['id']!)),
+            builder: (context, state) => PokemonDetailPage(
+              id: int.parse(state.pathParameters['id']!),
+              preview: state.extra as Pokemon?,
+            ),
           ),
           GoRoute(
             path: AppRoutes.favorites,

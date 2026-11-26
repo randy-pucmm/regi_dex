@@ -26,6 +26,9 @@ class PokemonImage extends StatelessWidget {
 
   final String? url;
 
+  /// Enlaza la imagen del catálogo con la del detalle.
+  static String heroTag(int pokemonId) => 'pokemon-$pokemonId';
+
   /// Alto del hexágono; la imagen ocupa un cuadrado de este lado.
   final double size;
   final BaseCacheManager cacheManager;

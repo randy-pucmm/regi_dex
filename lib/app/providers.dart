@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/connectivity/budgeted_health_checker.dart';
 import '../core/connectivity/connectivity_monitor.dart';
@@ -198,6 +199,17 @@ final pokemonDetailProvider = StreamProvider.family<PokemonDetail?, int>(
 
 final pokemonEvolutionsProvider = StreamProvider.family<EvolutionChain?, int>(
   (ref, id) => ref.watch(pokemonDetailRepositoryProvider).watchEvolutions(id),
+);
+
+final favoriteIdsProvider = StreamProvider<Set<int>>(
+  (ref) => ref.watch(appDatabaseProvider).favoriteDao.watchFavoriteIds(),
+);
+
+/// Abre la hoja de compartir del sistema. Las pruebas lo sobrescriben.
+final shareTextProvider = Provider<Future<void> Function(String)>(
+  (ref) => (text) async {
+    await SharePlus.instance.share(ShareParams(text: text));
+  },
 );
 
 final typeChartProvider = StreamProvider<TypeChart>(
