@@ -6,11 +6,13 @@ import '../ui/themes/regi_themes.dart';
 import 'catalog_auto_sync.dart';
 import 'providers.dart';
 import 'router.dart';
+import 'sync_retry.dart';
 
 /// Raíz de la aplicación: `MaterialApp.router` con el router del provider y el
 /// tema Regi y el modo que el usuario eligió en Ajustes.
 /// Mantiene vivos el monitor de conectividad y la sincronización automática
-/// del catálogo mientras la app esté abierta.
+/// del catálogo y los reintentos de las sincronizaciones fallidas mientras la
+/// app esté abierta.
 class RegiDexApp extends ConsumerWidget {
   const RegiDexApp({super.key});
 
@@ -18,6 +20,7 @@ class RegiDexApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(connectivityMonitorProvider);
     ref.watch(catalogAutoSyncProvider);
+    ref.watch(syncRetryProvider);
     final appearance = ref.watch(appearanceProvider);
     return MaterialApp.router(
       title: 'RegiDex',
