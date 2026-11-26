@@ -13,6 +13,8 @@ typedef PokemonDetailRows = ({
   List<TypeRow> types,
   List<PokemonStatRow> stats,
   List<({AbilityRow ability, bool isHidden})> abilities,
+  List<EggGroupRow> eggGroups,
+  List<PokemonFormRow> forms,
 });
 
 /// Un movimiento que aprende un Pokémon, con los datos del movimiento.
@@ -358,47 +360,68 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   Stream<PokemonDetailRows?> watchPokemonDetail(int id) {
     final typeTable = attachedDatabase.types;
     final abilityTable = attachedDatabase.abilities;
-    return (select(pokemons)..where((p) => p.id.equals(id)))
-        .watchSingleOrNull()
-        .asyncMap((pokemon) async {
-          if (pokemon == null) return null;
-          final types =
-              await (select(typeTable).join([
-                      innerJoin(
-                        pokemonTypes,
-                        pokemonTypes.typeId.equalsExp(typeTable.id),
-                      ),
-                    ])
-                    ..where(pokemonTypes.pokemonId.equals(id))
-                    ..orderBy([OrderingTerm.asc(pokemonTypes.slot)]))
-                  .map((row) => row.readTable(typeTable))
-                  .get();
-          final stats = await (select(
-            pokemonStats,
-          )..where((s) => s.pokemonId.equals(id))).get();
-          final abilities =
-              await (select(abilityTable).join([
-                      innerJoin(
-                        pokemonAbilities,
-                        pokemonAbilities.abilityId.equalsExp(abilityTable.id),
-                      ),
-                    ])
-                    ..where(pokemonAbilities.pokemonId.equals(id))
-                    ..orderBy([OrderingTerm.asc(pokemonAbilities.slot)]))
-                  .map(
-                    (row) => (
-                      ability: row.readTable(abilityTable),
-                      isHidden: row.read(pokemonAbilities.isHidden)!,
-                    ),
-                  )
-                  .get();
-          return (
-            pokemon: pokemon,
-            types: types,
-            stats: stats,
-            abilities: abilities,
-          );
-        });
+    return (select(
+      pokemons,
+    )..where((p) => p.id.equals(id))).watchSingleOrNull().asyncMap((
+      pokemon,
+    ) async {
+      if (pokemon == null) return null;
+      final types =
+          await (select(typeTable).join([
+                  innerJoin(
+                    pokemonTypes,
+                    pokemonTypes.typeId.equalsExp(typeTable.id),
+                  ),
+                ])
+                ..where(pokemonTypes.pokemonId.equals(id))
+                ..orderBy([OrderingTerm.asc(pokemonTypes.slot)]))
+              .map((row) => row.readTable(typeTable))
+              .get();
+      final stats = await (select(
+        pokemonStats,
+      )..where((s) => s.pokemonId.equals(id))).get();
+      final abilities =
+          await (select(abilityTable).join([
+                  innerJoin(
+                    pokemonAbilities,
+                    pokemonAbilities.abilityId.equalsExp(abilityTable.id),
+                  ),
+                ])
+                ..where(pokemonAbilities.pokemonId.equals(id))
+                ..orderBy([OrderingTerm.asc(pokemonAbilities.slot)]))
+              .map(
+                (row) => (
+                  ability: row.readTable(abilityTable),
+                  isHidden: row.read(pokemonAbilities.isHidden)!,
+                ),
+              )
+              .get();
+      final eggGroupTable = attachedDatabase.eggGroups;
+      final eggGroups =
+          await (select(eggGroupTable).join([
+                  innerJoin(
+                    speciesEggGroups,
+                    speciesEggGroups.eggGroupId.equalsExp(eggGroupTable.id),
+                  ),
+                ])
+                ..where(speciesEggGroups.speciesId.equals(pokemon.speciesId))
+                ..orderBy([OrderingTerm.asc(eggGroupTable.id)]))
+              .map((row) => row.readTable(eggGroupTable))
+              .get();
+      final forms =
+          await (select(pokemonForms)
+                ..where((f) => f.speciesId.equals(pokemon.speciesId))
+                ..orderBy([(f) => OrderingTerm.asc(f.pokemonId)]))
+              .get();
+      return (
+        pokemon: pokemon,
+        types: types,
+        stats: stats,
+        abilities: abilities,
+        eggGroups: eggGroups,
+        forms: forms,
+      );
+    });
   }
 
   /// La cadena evolutiva de [pokemonId]; null si no está o no se descargó.

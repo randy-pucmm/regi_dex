@@ -36,8 +36,23 @@ class PokemonDetailRepositoryImpl implements PokemonDetailRepository {
                 shortEffect: a.ability.shortEffect,
               ),
           ],
+          speciesId: rows.pokemon.speciesId,
+          shinyUrl: rows.pokemon.artworkShinyUrl ?? rows.pokemon.spriteShinyUrl,
+          eggGroups: [for (final g in rows.eggGroups) g.nameEs ?? g.name],
+          forms: [
+            for (final f in rows.forms)
+              PokemonFormRef(id: f.pokemonId, label: _formLabel(f.formName)),
+          ],
         );
       });
+
+  static String _formLabel(String? formName) {
+    if (formName == null || formName.isEmpty) return 'Normal';
+    return formName
+        .split('-')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
 
   @override
   Future<MoveGames> moveGames(int pokemonId) async => MoveGames(
