@@ -4,8 +4,9 @@ import 'providers.dart';
 
 /// Acción de «Sincronizar ahora» (IND-08): vuelve a comprobar PokéAPI y luego
 /// sincroniza el catálogo. Si la sincronización falla no se propaga: ya queda
-/// en `sync_metadata` y el LED lo refleja; el reintento con backoff es de
-/// RD-28. Una pasada en curso se reutiliza (single-flight), no se duplica.
+/// en `sync_metadata` y el LED lo refleja; el reintento con backoff lo hace
+/// `syncRetryProvider`. Una pasada en curso se reutiliza (single-flight), no se
+/// duplica.
 final syncNowProvider = Provider<Future<void> Function()>((ref) {
   return () async {
     if (!ref.mounted) return;

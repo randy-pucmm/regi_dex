@@ -10,6 +10,7 @@ import '../core/connectivity/network_source.dart';
 import '../core/connectivity/service_status.dart';
 import '../core/database/app_database.dart';
 import '../core/error/failure.dart';
+import '../core/images/image_prefetcher.dart';
 import '../core/network/operation_loader.dart';
 import '../core/network/poke_api_client.dart';
 import '../core/network/poke_api_config.dart';
@@ -19,6 +20,8 @@ import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/detail_sync.dart';
+import '../features/pokemon/data/image_sync.dart';
+import '../features/pokemon/data/integrity_checker.dart';
 import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
@@ -33,6 +36,7 @@ import '../features/pokemon/domain/search_pokemon_remote.dart';
 import '../features/pokemon/domain/sync_pokemon_detail.dart';
 import '../features/pokemon/domain/type_chart.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
+import 'image_providers.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
 /// con una base en memoria.
@@ -112,6 +116,13 @@ final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
   return coordinator;
 });
 
+/// Estado de sync de todos los recursos (`sync_metadata`), como flujo. Lo
+/// observan la descarga de imágenes y los reintentos; las pruebas de pantallas
+/// lo sustituyen por un flujo fijo.
+final syncMetadataStreamProvider = Provider<Stream<List<SyncMetadataRow>>>(
+  (ref) => ref.watch(appDatabaseProvider).syncMetadataDao.watchAll(),
+);
+
 /// Estado de la sincronización para el indicador global.
 final syncStatusProvider = StreamProvider<SyncStatus>(
   (ref) => ref.watch(syncCoordinatorProvider).statuses,
@@ -141,6 +152,46 @@ final detailSyncProvider = Provider<DetailSync>(
     remote: ref.watch(pokemonRemoteSourceProvider),
     local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
     coordinator: ref.watch(syncCoordinatorProvider),
+  ),
+);
+
+/// Descarga de imágenes a la caché de disco. La caché se abre al descargar,
+/// no al observar el avance.
+final imagePrefetcherProvider = Provider<ImagePrefetcher>((ref) {
+  final prefetcher = ImagePrefetcher(
+    isCached: (url) async =>
+        await ref.read(imageCacheManagerProvider).getFileFromCache(url) != null,
+    download: (url) => ref.read(imageCacheManagerProvider).getSingleFile(url),
+  );
+  ref.onDispose(prefetcher.dispose);
+  return prefetcher;
+});
+
+/// Avance de la descarga de imágenes en segundo plano.
+final imageProgressProvider = StreamProvider<ImagePrefetchProgress>(
+  (ref) => ref.watch(imagePrefetcherProvider).progress,
+);
+
+/// Descarga en segundo plano de los sprites del catálogo (no gasta el
+/// presupuesto de PokéAPI).
+final imageSyncProvider = Provider<ImageSync>(
+  (ref) => ImageSync(
+    catalog: ref.watch(appDatabaseProvider).catalogDao,
+    prefetcher: ref.watch(imagePrefetcherProvider),
+    coordinator: ref.watch(syncCoordinatorProvider),
+  ),
+);
+
+/// Verificación de integridad del catálogo (OF-19..21): detecta filas
+/// alteradas en el dispositivo y las restaura desde PokéAPI.
+final integrityCheckerProvider = Provider<IntegrityChecker>(
+  (ref) => IntegrityChecker(
+    remote: ref.watch(pokemonRemoteSourceProvider),
+    local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
+    metadata: ref.watch(appDatabaseProvider).syncMetadataDao,
+    budget: ref.watch(apiBudgetProvider),
+    isOnline: () =>
+        ref.read(serviceStatusProvider).value?.status == ServiceStatus.online,
   ),
 );
 
@@ -244,10 +295,21 @@ final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>(
 );
 
 /// Descarga el detalle al abrir un Pokémon. Devuelve false si no se pudo: la
-/// pantalla sigue con lo local.
-final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>(
-  (ref, id) => ref
-      .watch(syncPokemonDetailProvider)(id)
-      .then((_) => true)
-      .onError<Failure>((_, _) => false),
-);
+/// pantalla sigue con lo local. Si el detalle estaba vigente y no hubo
+/// descarga, lo compara con el remoto sin esperar (OF-20); cuando sí se
+/// descargó, esa comparación ya la hizo la descarga.
+final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>((
+  ref,
+  id,
+) async {
+  final wasFresh = await ref.read(detailSyncProvider).isFresh(id);
+  try {
+    await ref.watch(syncPokemonDetailProvider)(id);
+  } on Failure {
+    return false;
+  }
+  if (wasFresh && ref.mounted) {
+    unawaited(ref.read(integrityCheckerProvider).verifyPokemon(id));
+  }
+  return true;
+});

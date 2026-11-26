@@ -17,13 +17,16 @@ void main() {
   late AppDatabase db;
   late FakeTime time;
   late SyncCoordinator coordinator;
+  late List<String> logs;
 
   setUp(() {
     db = createTestDatabase();
     time = FakeTime();
+    logs = [];
     coordinator = SyncCoordinator(
       metadata: db.syncMetadataDao,
       backoff: BackoffPolicy(jitter: 0),
+      log: logs.add,
     );
   });
   tearDown(() async {
@@ -362,6 +365,37 @@ void main() {
         expect(received, [SyncStatus.completada]);
       }),
     );
+  });
+
+  group('registro en consola', () {
+    test('cada fallo deja una línea con el intento y la espera', () async {
+      await failOnce('catalog');
+      await failOnce('catalog');
+
+      expect(logs, hasLength(2));
+      expect(logs[0], contains('catalog falló (intento 1 de 5)'));
+      expect(logs[0], contains('reintento en 2.0 s'));
+      expect(logs[1], contains('intento 2 de 5'));
+      expect(logs[1], contains('reintento en 4.0 s'));
+    });
+
+    test('con el quinto fallo avisa que no hay más reintentos', () async {
+      for (var i = 0; i < 5; i++) {
+        await failOnce('catalog');
+      }
+
+      expect(logs.last, contains('intento 5 de 5'));
+      expect(logs.last, contains('sin más reintentos'));
+    });
+
+    test('un 429 muestra la espera pedida por Retry-After', () async {
+      await failOnce(
+        'catalog',
+        const RateLimitFailure('429', retryAfter: Duration(seconds: 90)),
+      );
+
+      expect(logs.single, contains('reintento en 90.0 s'));
+    });
   });
 
   test('dispose cierra el flujo de estados', () async {

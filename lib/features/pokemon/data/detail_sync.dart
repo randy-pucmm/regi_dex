@@ -42,8 +42,11 @@ class DetailSync {
   /// y se refresca cuando hay servicio y presupuesto.
   static const detailMaxAge = Duration(days: 3);
 
+  /// Prefijo de las claves de `sync_metadata` de los detalles.
+  static const keyPrefix = 'detail:';
+
   /// Clave de `sync_metadata` del detalle de [pokemonId].
-  static String resourceKey(int pokemonId) => 'detail:$pokemonId';
+  static String resourceKey(int pokemonId) => '$keyPrefix$pokemonId';
 
   final PokemonRemoteSource _remote;
   final CatalogLocalSource _local;

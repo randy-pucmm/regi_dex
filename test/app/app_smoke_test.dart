@@ -7,6 +7,7 @@ import 'package:regi_dex/app/app.dart';
 import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/app/shell_status.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
+import 'package:regi_dex/core/database/app_database.dart';
 import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
 import 'package:regi_dex/features/favorites/presentation/favorites_page.dart';
@@ -75,6 +76,9 @@ Future<void> _pumpApp(
         networkSourceProvider.overrideWithValue(FakeNetworkSource()),
         healthCheckerProvider.overrideWithValue(health ?? FakeHealthChecker()),
         appDatabaseProvider.overrideWithValue(db),
+        syncMetadataStreamProvider.overrideWithValue(
+          const Stream<List<SyncMetadataRow>>.empty(),
+        ),
         pokemonRepositoryProvider.overrideWithValue(
           repository ?? FakePokemonRepository(),
         ),

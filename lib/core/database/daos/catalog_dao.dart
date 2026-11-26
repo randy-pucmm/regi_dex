@@ -17,6 +17,15 @@ typedef PokemonDetailRows = ({
   List<PokemonFormRow> forms,
 });
 
+/// Lo que entra al `content_hash` de un Pokémon, leído de la base, junto con
+/// el hash guardado.
+typedef PokemonHashRows = ({
+  PokemonRow pokemon,
+  List<PokemonTypeRow> types,
+  List<PokemonAbilityRow> abilities,
+  List<PokemonStatRow> stats,
+});
+
 /// Un movimiento que aprende un Pokémon, con los datos del movimiento.
 typedef PokemonMoveEntry = ({
   int moveId,
@@ -265,6 +274,61 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
 
   /// Cantidad de Pokémon del catálogo.
   Future<int> countPokemon() => watchPokemonCount().first;
+
+  /// Los Pokémon con las filas que entran al `content_hash`, por número
+  /// nacional; con [ids] solo esos. Usa cuatro consultas en total, sin importar
+  /// cuántos Pokémon sean.
+  Future<List<PokemonHashRows>> hashRows({Iterable<int>? ids}) async {
+    final wanted = ids?.toSet();
+    final inWanted = wanted == null
+        ? null
+        : (Expression<int> column) => column.isIn(wanted);
+    final rows =
+        await (select(pokemons)
+              ..where((p) => inWanted?.call(p.id) ?? const Constant(true))
+              ..orderBy([(p) => OrderingTerm.asc(p.id)]))
+            .get();
+    final types = await (select(
+      pokemonTypes,
+    )..where((t) => inWanted?.call(t.pokemonId) ?? const Constant(true))).get();
+    final abilities = await (select(
+      pokemonAbilities,
+    )..where((t) => inWanted?.call(t.pokemonId) ?? const Constant(true))).get();
+    final stats = await (select(
+      pokemonStats,
+    )..where((t) => inWanted?.call(t.pokemonId) ?? const Constant(true))).get();
+
+    Map<int, List<T>> byPokemon<T>(List<T> list, int Function(T) idOf) {
+      final map = <int, List<T>>{};
+      for (final item in list) {
+        (map[idOf(item)] ??= []).add(item);
+      }
+      return map;
+    }
+
+    final typesBy = byPokemon(types, (t) => t.pokemonId);
+    final abilitiesBy = byPokemon(abilities, (t) => t.pokemonId);
+    final statsBy = byPokemon(stats, (t) => t.pokemonId);
+    return [
+      for (final pokemon in rows)
+        (
+          pokemon: pokemon,
+          types: typesBy[pokemon.id] ?? const [],
+          abilities: abilitiesBy[pokemon.id] ?? const [],
+          stats: statsBy[pokemon.id] ?? const [],
+        ),
+    ];
+  }
+
+  /// URL de los sprites de la lista, por número nacional y sin repetir.
+  Future<List<String>> spriteUrls() async {
+    final query = selectOnly(pokemons)
+      ..addColumns([pokemons.spriteUrl])
+      ..where(pokemons.spriteUrl.isNotNull())
+      ..orderBy([OrderingTerm.asc(pokemons.id)]);
+    final rows = await query.map((r) => r.read(pokemons.spriteUrl)!).get();
+    return rows.toSet().toList();
+  }
 
   /// Pokémon por id, o null si no está en el catálogo.
   Future<PokemonRow?> getPokemon(int id) =>

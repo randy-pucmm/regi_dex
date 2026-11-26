@@ -43,6 +43,6 @@ Future<void> _syncIfNeeded(Ref ref) async {
     await ref.read(refreshCatalogProvider)();
   } catch (_) {
     // Un fallo ya queda en sync_metadata (intentos y próximo reintento) y la
-    // interfaz sigue sirviendo la base local; el reintento llega con RD-28.
+    // interfaz sigue sirviendo la base local; reintenta `syncRetryProvider`.
   }
 }

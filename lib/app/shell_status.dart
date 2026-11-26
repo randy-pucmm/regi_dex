@@ -3,9 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/connectivity/service_status.dart';
+import '../core/database/app_database.dart';
 import '../core/error/failure.dart';
+import '../core/images/image_prefetcher.dart';
 import '../core/sync/sync_status.dart';
 import '../features/pokemon/data/catalog_sync.dart';
+import '../features/pokemon/data/image_sync.dart';
 import '../ui/components/indicator_glyph.dart';
 import '../ui/components/status_popover.dart';
 import '../ui/tokens/led_state.dart';
@@ -20,12 +23,35 @@ final visibleResourceProvider = Provider<String>(
 
 /// Hora de la última sync correcta del recurso visible; null si no hubo. Una
 /// sync más reciente de otro recurso no cuenta: si la referencia se actualiza
-/// pero el catálogo falla, el indicador no debe decir que está al día.
+/// pero el catálogo falla, el indicador no debe decir que está al día. La
+/// primera sync del catálogo no se da por completa hasta que se descargaron
+/// las imágenes (ver `imageAutoSyncProvider`).
 final lastSyncAtProvider = StreamProvider<DateTime?>((ref) {
   final dao = ref.watch(appDatabaseProvider).syncMetadataDao;
   final resourceKey = ref.watch(visibleResourceProvider);
-  return dao.watchEntry(resourceKey).map((row) => row?.lastSuccessAt);
+  return dao
+      .watchAll()
+      .map((rows) => completedSyncAt(rows, resourceKey))
+      .distinct();
 });
+
+/// Hora de la última sync correcta de [resourceKey] según [rows] (las filas de
+/// `sync_metadata`); null si no hubo. Con el catálogo exige además que las
+/// imágenes se hayan descargado alguna vez.
+DateTime? completedSyncAt(List<SyncMetadataRow> rows, String resourceKey) {
+  SyncMetadataRow? find(String key) {
+    for (final row in rows) {
+      if (row.resourceKey == key) return row;
+    }
+    return null;
+  }
+
+  if (resourceKey == CatalogSync.resourceKey &&
+      find(ImageSync.resourceKey)?.lastSuccessAt == null) {
+    return null;
+  }
+  return find(resourceKey)?.lastSuccessAt;
+}
 
 final shellStatusProvider = Provider<ShellStatus>((ref) {
   return buildShellStatus(
@@ -34,6 +60,8 @@ final shellStatusProvider = Provider<ShellStatus>((ref) {
     sync: ref.watch(syncStatusProvider).value ?? SyncStatus.inactiva,
     lastSyncAt: ref.watch(lastSyncAtProvider).value,
     now: clock.now(),
+    images:
+        ref.watch(imageProgressProvider).value ?? ImagePrefetchProgress.idle,
   );
 });
 
@@ -95,6 +123,7 @@ ShellStatus buildShellStatus({
   required SyncStatus sync,
   required DateTime? lastSyncAt,
   required DateTime now,
+  ImagePrefetchProgress images = ImagePrefetchProgress.idle,
 }) {
   final stable = connectivity.status;
   final verifying = stable == ServiceStatus.verificando;
@@ -170,6 +199,8 @@ ShellStatus buildShellStatus({
       LedState.sync => 'Actualizando…',
       LedState.offline || LedState.down => 'Locales · $local',
     }),
+    if (images.isRunning)
+      StatusRow('Imágenes', '${images.done} de ${images.total}'),
     if (connectivity.nextRetryAt case final retry?)
       StatusRow('Reintento', _inText(retry.difference(now))),
   ];

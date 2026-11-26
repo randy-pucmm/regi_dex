@@ -81,6 +81,38 @@ class CatalogLocalSource {
     );
   }
 
+  /// `content_hash` recalculado desde las filas locales (OF-19) de todo el
+  /// catálogo, o solo de [ids]: id → (hash guardado, hash recalculado). No usa
+  /// el guardado para calcular, así que detecta filas alteradas en el
+  /// dispositivo.
+  Future<Map<int, ({String? stored, String computed})>> contentHashes({
+    Iterable<int>? ids,
+  }) async {
+    final rows = await _db.catalogDao.hashRows(ids: ids);
+    return {
+      for (final row in rows)
+        row.pokemon.id: (
+          stored: row.pokemon.contentHash,
+          computed: computeContentHash(
+            name: row.pokemon.name,
+            height: row.pokemon.height,
+            weight: row.pokemon.weight,
+            types: [
+              for (final t in row.types) (slot: t.slot, typeId: t.typeId),
+            ],
+            abilities: [
+              for (final a in row.abilities)
+                (slot: a.slot, abilityId: a.abilityId, isHidden: a.isHidden),
+            ],
+            stats: [
+              for (final s in row.stats)
+                (statId: s.statId, baseStat: s.baseStat),
+            ],
+          ),
+        ),
+    };
+  }
+
   /// Guarda el detalle completo de un Pokémon en **una sola transacción**
   /// (PS-07, todo o nada): si algo falla no queda nada del detalle. Reemplaza
   /// tipos, stats, habilidades, movimientos, variantes y cadena evolutiva, y

@@ -193,9 +193,9 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 | Disparadores | Inicio, reconexión, abrir un detalle, cada 30 min y manual («Sincronizar ahora»). |
 | Concurrencia | *Single-flight* por recurso. |
 | Presupuesto | Máximo 90 llamadas por ventana móvil de 60 min, registradas en `api_call_log` (también cuentan los health-check). Si se agota, la llamada no sale y el estado del servicio no cambia. |
-| Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ, tope de 60 s, máximo 5 intentos. |
+| Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ ±20 %, tope de 60 s, máximo 5 intentos; ante un 429 se espera lo que pida `Retry-After` (mínimo 60 s). Cada fallo y su reintento quedan en la consola. |
 | Interrupciones | Cada lote es una transacción con su avance en `sync_metadata`; se reanuda desde el último lote confirmado. |
-| Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI; **el remoto gana**. Los datos del usuario nunca se tocan. |
+| Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI (`IntegrityChecker`); **el remoto gana**. Los datos del usuario nunca se tocan. Ver «Verificación de integridad». |
 
 **Sincronización del catálogo.** `CatalogSync` corre bajo el coordinador con la clave `catalog`:
 
@@ -242,6 +242,19 @@ Limitación: la búsqueda por nombre usa el nombre en inglés de PokéAPI y no u
 - `watchFilterOptions()` y `watchAvailability()` alimentan el panel de filtros y el aviso de catálogo parcial; `loadQuery()` y `saveQuery()` guardan la consulta entre sesiones.
 - Al abrir la app y cada vez que el servicio pasa a online, `catalogAutoSyncProvider` sincroniza el catálogo si hace falta: nunca se completó, quedó a medias o fallida, o tiene más de 7 días. Se lanza sin esperar, así que no bloquea el arranque. Con el catálogo vigente no hace ninguna llamada.
 
+**Reintentos automáticos (RD-28).** `SyncCoordinator` deja en `sync_metadata` el fallo, el número de intento y la hora del próximo reintento (`max(backoff, Retry-After)`) y escribe una línea en la consola, por ejemplo `[Sync] catalog falló (intento 2 de 5): NetworkFailure…; reintento en 4.0 s`. `syncRetryProvider` observa esas filas, espera hasta la hora indicada y relanza el catálogo, las imágenes o el detalle fallido. Si en ese momento no hay servicio no gasta el intento: lo retoma al volver el servicio (PA-07). Agotados los 5 intentos, la sincronización espera a una reconexión, a «Sincronizar ahora» o al siguiente disparador. Una respuesta **parcial** (datos con errores) se acepta y se valida como cualquier otra, y queda anotada en la consola.
+
+**Imágenes en segundo plano.** Los sprites de la lista no gastan presupuesto de PokéAPI (salen de GitHub), así que en la primera corrida se bajan todos (~1025) apenas el catálogo está completo y hay servicio (`ImageSync`, clave `images`, 6 descargas a la vez). Mientras tanto el LED dice «Sincronizando» y el detalle del LED muestra «Imágenes: N de T». La primera sync **no se presenta como completa** (sin «actualizado hh:mm») hasta que terminan. Se saltan las ya cacheadas, una imagen que el servidor no tiene (4xx) no cuenta como fallo y, si la red falla varias veces seguidas, se detiene y se reintenta con backoff. El artwork grande sigue siendo bajo demanda, al abrir el detalle.
+
+**Verificación de integridad (OF-19..21, D14).** `IntegrityChecker` detecta y corrige datos del catálogo editados en el dispositivo (por ejemplo, con el Database Inspector):
+
+1. Recalcula el SHA-1 de cada Pokémon desde sus filas (nombre, medidas, tipos, habilidades y stats) y lo compara con `content_hash`; los que no coinciden quedan **marcados**. Es local, sin red y barato (cuatro consultas).
+2. Arma un lote de hasta **200 ids**: primero los marcados y luego los siguientes de un recorrido rotativo del catálogo (el último id verificado se guarda en `sync_metadata`, clave `integrity`, y al llegar al final da la vuelta). Pide el lote con `GetPokemonsByIds` (una llamada).
+3. Si el hash remoto difiere del recalculado o del guardado, restaura esas filas en **una transacción**: el remoto gana. Una respuesta inválida o un fallo de red no cambian nada y se reintentan en el siguiente disparador. Solo se escriben tablas del catálogo: favoritos, trivia y equipos no se tocan (OF-21).
+4. Se ejecuta cuando el servicio pasa a online (inicio y reconexión), cada 30 min mientras siga online y al abrir un detalle que estaba vigente (se compara ese Pokémon con el remoto, una vez por sesión; si el hash local no coincide, siempre). Se omite mientras se descarga el catálogo.
+5. Prioridad del presupuesto (ADR-005): el recorrido rotativo se omite si quedan menos de 10 llamadas libres en la ventana, para dejarlas a la interacción del usuario; los marcados siempre se intentan.
+6. No enciende el LED «Sincronizando» (no pasa por el coordinador). La consola muestra `[Integridad] verificados 200 · restaurados 1 (ids 25)` o `sin diferencias`.
+
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
 
 ## 10. Persistencia local
@@ -254,6 +267,7 @@ Las **imágenes no se guardan en la base de datos**:
 - Se usa una caché de archivos LRU de 150 MB y 1500 archivos (`RegiImageCacheManager`). La librería expulsa por antigüedad al pasar de 1500 archivos; la clase recorta los bytes sobrantes cada vez que se descarga algo nuevo.
 - `PokemonImage` decodifica al tamaño del contenedor y, sin la imagen en la caché y sin red, muestra el respaldo «Imagen no disponible offline».
 - Los favoritos quedan fijados para uso offline (ADR-004).
+- Los sprites de la lista se descargan todos en segundo plano en la primera corrida (ver §9); el artwork se cachea al abrir cada detalle.
 
 **Índices de las consultas del catálogo (RNF-REN-02).** Los filtros se escriben con `EXISTS` sobre las tablas puente, así el join de tipos solo sirve para mostrar y no recorta el segundo tipo de cada Pokémon. Los planes de `EXPLAIN QUERY PLAN` se comprueban en `test/core/database/catalog_query_plans_test.dart`:
 
