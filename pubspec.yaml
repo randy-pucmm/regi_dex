@@ -59,6 +59,7 @@ dependencies:
 
   # SHA-1 del content_hash de integridad (ADR-006).
   crypto: 3.0.8
+  share_plus: 13.3.1
 
 dev_dependencies:
   flutter_test:
