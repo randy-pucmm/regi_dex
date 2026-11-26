@@ -118,6 +118,13 @@ class _Detail extends ConsumerWidget {
     final isFavorite =
         ref.watch(favoriteIdsProvider).value?.contains(heroId) ?? false;
     final artwork = pokemon.artworkUrl ?? pokemon.spriteUrl;
+    // PokéAPI no lista movimientos de las Gigamax: usan los de la base.
+    final hasMoves = ref
+        .watch(pokemonMoveGamesProvider(pokemon.id))
+        .value
+        ?.games
+        .isNotEmpty;
+    final movesId = hasMoves == false ? heroId : pokemon.id;
     final art = detail.genderArt;
     final shownFemale = female && art != null;
     final image = art == null
@@ -224,8 +231,8 @@ class _Detail extends ConsumerWidget {
         const SizedBox(height: 12),
         _Panel(
           child: PokemonMovesSection(
-            key: ValueKey(pokemon.id),
-            pokemonId: pokemon.id,
+            key: ValueKey(movesId),
+            pokemonId: movesId,
           ),
         ),
       ],

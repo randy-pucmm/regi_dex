@@ -43,6 +43,8 @@ Future<void> _open(
   WidgetTester tester,
   Stream<PokemonDetail?> detail, {
   List<String>? shared,
+  PokemonDetail? form,
+  MoveGames games = const MoveGames.empty(),
 }) async {
   useScreen(tester, const Size(390, 844));
   final db = createTestDatabase();
@@ -56,10 +58,12 @@ Future<void> _open(
         typeChartProvider.overrideWith(
           (ref) => Stream.value(const TypeChart.empty()),
         ),
-        pokemonMoveGamesProvider(1)
+        pokemonMoveGamesProvider(1).overrideWith((ref) => games),
+        pokemonDetailProvider(2).overrideWith((ref) => Stream.value(form)),
+        pokemonDetailRefreshProvider(2).overrideWith((ref) => form != null),
+        pokemonEvolutionsProvider(2).overrideWith((ref) => Stream.value(null)),
+        pokemonMoveGamesProvider(2)
             .overrideWith((ref) => const MoveGames.empty()),
-        pokemonDetailProvider(2).overrideWith((ref) => Stream.value(null)),
-        pokemonDetailRefreshProvider(2).overrideWith((ref) => false),
         appDatabaseProvider.overrideWithValue(db),
         favoriteIdsProvider.overrideWith((ref) => Stream.value({1})),
         shareTextProvider.overrideWithValue((text) async => shared?.add(text)),
@@ -237,6 +241,37 @@ void main() {
 
     expect(find.text('Alola Cap'), findsOneWidget);
     expect(find.text('Rock Star'), findsOneWidget);
+  });
+
+  testWidgets('una forma sin movimientos muestra los de la base', (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      Stream.value(
+        _detail(
+          forms: const [
+            PokemonFormRef(id: 1, label: 'Normal'),
+            PokemonFormRef(id: 2, label: 'Gmax'),
+          ],
+        ),
+      ),
+      form: PokemonDetail.preview(
+        const Pokemon(id: 2, name: 'x-gmax', baseStatTotal: 0, types: []),
+      ),
+      games: const MoveGames(
+        games: [MoveGame(id: 20, name: 'sword-shield')],
+        defaultId: 20,
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Gmax'));
+    await tester.tap(find.text('Gmax'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Movimientos'), 300);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sword Shield'), findsOneWidget);
   });
 
   test('el efecto largo se recorta a 160 caracteres como máximo', () {
