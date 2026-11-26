@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart';
 
 import '../database/app_database.dart';
 import '../database/daos/sync_metadata_dao.dart';
@@ -23,13 +24,20 @@ abstract final class SyncMetadataStatus {
 /// Uso: `await coordinator.run('catalog', () => ...)`. Una segunda solicitud
 /// del mismo recurso mientras corre la primera recibe el mismo `Future`. Los
 /// reintentos automáticos no están aquí: la coordinación solo deja en
-/// `sync_metadata` cuántos intentos van y cuándo toca el siguiente.
+/// `sync_metadata` cuántos intentos van y cuándo toca el siguiente; quien
+/// reintenta es el planificador de `lib/app/sync_retry.dart`.
 class SyncCoordinator {
-  SyncCoordinator({required this._metadata, BackoffPolicy? backoff})
-    : _backoff = backoff ?? BackoffPolicy();
+  /// [log] recibe una línea por fallo y reintento (por defecto, la consola).
+  SyncCoordinator({
+    required this._metadata,
+    BackoffPolicy? backoff,
+    void Function(String message)? log,
+  }) : _backoff = backoff ?? BackoffPolicy(),
+       _log = log ?? debugPrint;
 
   final SyncMetadataDao _metadata;
   final BackoffPolicy _backoff;
+  final void Function(String message) _log;
   final _inFlight = <String, Future<dynamic>>{};
   final _controller = StreamController<SyncStatus>.broadcast();
   var _running = 0;
@@ -135,9 +143,12 @@ class SyncCoordinator {
   ) async {
     final attempts = previousAttempts + 1;
     final hasAttemptsLeft = _backoff.hasAttemptsLeft(attempts);
-    final nextRetryAt = hasAttemptsLeft
-        ? clock.now().add(_retryDelay(attempts, error))
-        : null;
+    final delay = hasAttemptsLeft ? _retryDelay(attempts, error) : null;
+    final nextRetryAt = delay == null ? null : clock.now().add(delay);
+    _log(
+      '[Sync] $key falló (intento $attempts de ${_backoff.maxAttempts}): '
+      '$error; ${delay == null ? 'sin más reintentos' : 'reintento en ${delay.inMilliseconds / 1000} s'}',
+    );
     try {
       await _metadata.upsert(
         SyncMetadataEntriesCompanion.insert(

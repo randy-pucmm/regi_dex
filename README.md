@@ -193,7 +193,7 @@ El flujo completo y la secuencia de consulta están en el [documento de arquitec
 | Disparadores | Inicio, reconexión, abrir un detalle, cada 30 min y manual («Sincronizar ahora»). |
 | Concurrencia | *Single-flight* por recurso. |
 | Presupuesto | Máximo 90 llamadas por ventana móvil de 60 min, registradas en `api_call_log` (también cuentan los health-check). Si se agota, la llamada no sale y el estado del servicio no cambia. |
-| Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ, tope de 60 s, máximo 5 intentos. |
+| Reintentos | Backoff exponencial con jitter: 2 s × 2ⁿ ±20 %, tope de 60 s, máximo 5 intentos; ante un 429 se espera lo que pida `Retry-After` (mínimo 60 s). Cada fallo y su reintento quedan en la consola. |
 | Interrupciones | Cada lote es una transacción con su avance en `sync_metadata`; se reanuda desde el último lote confirmado. |
 | Datos alterados | `content_hash` por fila y verificación por lotes contra PokéAPI; **el remoto gana**. Los datos del usuario nunca se tocan. |
 
@@ -242,6 +242,10 @@ Limitación: la búsqueda por nombre usa el nombre en inglés de PokéAPI y no u
 - `watchFilterOptions()` y `watchAvailability()` alimentan el panel de filtros y el aviso de catálogo parcial; `loadQuery()` y `saveQuery()` guardan la consulta entre sesiones.
 - Al abrir la app y cada vez que el servicio pasa a online, `catalogAutoSyncProvider` sincroniza el catálogo si hace falta: nunca se completó, quedó a medias o fallida, o tiene más de 7 días. Se lanza sin esperar, así que no bloquea el arranque. Con el catálogo vigente no hace ninguna llamada.
 
+**Reintentos automáticos (RD-28).** `SyncCoordinator` deja en `sync_metadata` el fallo, el número de intento y la hora del próximo reintento (`max(backoff, Retry-After)`) y escribe una línea en la consola, por ejemplo `[Sync] catalog falló (intento 2 de 5): NetworkFailure…; reintento en 4.0 s`. `syncRetryProvider` observa esas filas, espera hasta la hora indicada y relanza el catálogo, las imágenes o el detalle fallido. Si en ese momento no hay servicio no gasta el intento: lo retoma al volver el servicio (PA-07). Agotados los 5 intentos, la sincronización espera a una reconexión, a «Sincronizar ahora» o al siguiente disparador. Una respuesta **parcial** (datos con errores) se acepta y se valida como cualquier otra, y queda anotada en la consola.
+
+**Imágenes en segundo plano.** Los sprites de la lista no gastan presupuesto de PokéAPI (salen de GitHub), así que en la primera corrida se bajan todos (~1025) apenas el catálogo está completo y hay servicio (`ImageSync`, clave `images`, 6 descargas a la vez). Mientras tanto el LED dice «Sincronizando» y el detalle del LED muestra «Imágenes: N de T». La primera sync **no se presenta como completa** (sin «actualizado hh:mm») hasta que terminan. Se saltan las ya cacheadas, una imagen que el servidor no tiene (4xx) no cuenta como fallo y, si la red falla varias veces seguidas, se detiene y se reintenta con backoff. El artwork grande sigue siendo bajo demanda, al abrir el detalle.
+
 ![Estados de sincronización](docs/diagrams/D08_estados_sync.png)
 
 ## 10. Persistencia local
@@ -254,6 +258,7 @@ Las **imágenes no se guardan en la base de datos**:
 - Se usa una caché de archivos LRU de 150 MB y 1500 archivos (`RegiImageCacheManager`). La librería expulsa por antigüedad al pasar de 1500 archivos; la clase recorta los bytes sobrantes cada vez que se descarga algo nuevo.
 - `PokemonImage` decodifica al tamaño del contenedor y, sin la imagen en la caché y sin red, muestra el respaldo «Imagen no disponible offline».
 - Los favoritos quedan fijados para uso offline (ADR-004).
+- Los sprites de la lista se descargan todos en segundo plano en la primera corrida (ver §9); el artwork se cachea al abrir cada detalle.
 
 **Índices de las consultas del catálogo (RNF-REN-02).** Los filtros se escriben con `EXISTS` sobre las tablas puente, así el join de tipos solo sirve para mostrar y no recorta el segundo tipo de cada Pokémon. Los planes de `EXPLAIN QUERY PLAN` se comprueban en `test/core/database/catalog_query_plans_test.dart`:
 

@@ -4,6 +4,7 @@ import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/app/shell_status.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/error/failure.dart';
+import 'package:regi_dex/core/images/image_prefetcher.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
 import 'package:regi_dex/ui/components/indicator_glyph.dart';
 import 'package:regi_dex/ui/tokens/led_state.dart';
@@ -161,6 +162,22 @@ void main() {
         );
         expect(_row(status, 'PokéAPI'), text, reason: '$failure');
       }
+    });
+
+    test('mientras baja las imágenes muestra cuántas lleva', () {
+      final status = buildShellStatus(
+        connectivity: _online,
+        sync: SyncStatus.sincronizando,
+        lastSyncAt: null,
+        now: _now,
+        images: const ImagePrefetchProgress(done: 340, total: 1025),
+      );
+
+      expect(_row(status, 'Imágenes'), '340 de 1025');
+    });
+
+    test('sin descarga de imágenes en curso no muestra esa fila', () {
+      expect(_status().rows.map((r) => r.label), isNot(contains('Imágenes')));
     });
 
     test('muestra cuánto falta para el próximo reintento', () {
