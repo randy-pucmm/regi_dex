@@ -6,6 +6,7 @@ import '../domain/evolution_chain.dart';
 import '../domain/pokemon.dart';
 import '../domain/pokemon_move.dart';
 import '../domain/type_chart.dart';
+import '../domain/title_case.dart';
 import 'evolution_mapper.dart';
 import 'pokemon_entity_mapper.dart';
 
@@ -41,18 +42,15 @@ class PokemonDetailRepositoryImpl implements PokemonDetailRepository {
           eggGroups: [for (final g in rows.eggGroups) g.nameEs ?? g.name],
           forms: [
             for (final f in rows.forms)
-              PokemonFormRef(id: f.pokemonId, label: _formLabel(f.formName)),
+              PokemonFormRef(
+                id: f.pokemonId,
+                label: (f.formName ?? '').isEmpty
+                    ? 'Normal'
+                    : titleCase(f.formName!),
+              ),
           ],
         );
       });
-
-  static String _formLabel(String? formName) {
-    if (formName == null || formName.isEmpty) return 'Normal';
-    return formName
-        .split('-')
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
-  }
 
   @override
   Future<MoveGames> moveGames(int pokemonId) async => MoveGames(

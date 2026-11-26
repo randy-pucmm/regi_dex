@@ -1,3 +1,5 @@
+import 'title_case.dart';
+
 enum MoveMethod {
   all(null, 'Todos'),
   levelUp(1, 'Nivel'),
@@ -81,10 +83,7 @@ class MoveGame {
   /// Nombre de PokéAPI (`red-blue`).
   final String name;
 
-  String get label => name
-      .split('-')
-      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-      .join(' ');
+  String get label => titleCase(name);
 }
 
 class MoveGames {
