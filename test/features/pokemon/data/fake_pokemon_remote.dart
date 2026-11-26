@@ -39,6 +39,26 @@ class FakePokemonRemote implements PokemonRemoteSource {
     };
   }
 
+  /// Lotes pedidos con [fetchByIds], en orden.
+  final idBatches = <List<int>>[];
+
+  /// Falla [fetchByIds] con [NetworkFailure] mientras sea true.
+  var failByIds = false;
+
+  /// Permite alterar la respuesta de [fetchByIds] (la versión «remota»).
+  void Function(Map<String, dynamic> page)? tamperByIds;
+
+  @override
+  Future<Map<String, dynamic>> fetchByIds(List<int> ids) async {
+    idBatches.add([...ids]);
+    if (failByIds) throw const NetworkFailure();
+    final page = {
+      'pokemon': [for (final id in ids) syntheticPokemon(id)],
+    };
+    tamperByIds?.call(page);
+    return page;
+  }
+
   /// Ids pedidos con [fetchDetail], en orden.
   final detailIds = <int>[];
 

@@ -101,4 +101,38 @@ void main() {
       expect(logs, isEmpty);
     });
   });
+
+  group('fetchByIds', () {
+    test('pide GetPokemonsByIds con los ids y cuenta una llamada', () async {
+      Map<String, dynamic>? variables;
+      client = PokeApiClient(
+        endpoint: Uri.parse('https://example.test/graphql'),
+        loader: OperationLoader(),
+        httpClient: MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['query'], contains('query GetPokemonsByIds'));
+          variables = body['variables'] as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'pokemon': [syntheticPokemon(25), syntheticPokemon(26)],
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+        log: (_) {},
+      );
+      remote = PokemonRemoteSource(client: client, budget: budget);
+
+      final data = await remote.fetchByIds([25, 26]);
+
+      expect(variables, {
+        'ids': [25, 26],
+      });
+      expect(data['pokemon'] as List, hasLength(2));
+      expect(await budget.used(), 1);
+    });
+  });
 }

@@ -61,6 +61,12 @@ class PokemonRemoteSource {
   Future<Map<String, dynamic>> fetchDetail(int id) =>
       _call(GraphqlOperation.getPokemonDetail, {'id': id, 'langs': languages});
 
+  /// GetPokemonsByIds: la versión remota de los Pokémon con esos [ids] (verifica
+  /// la integridad del catálogo, OF-19/20). Una llamada por lote; entrega la
+  /// lista `pokemon` dentro del `data`.
+  Future<Map<String, dynamic>> fetchByIds(List<int> ids) =>
+      _call(GraphqlOperation.getPokemonsByIds, {'ids': ids});
+
   Future<Map<String, dynamic>> _call(
     GraphqlOperation operation,
     Map<String, dynamic> variables,
