@@ -33,6 +33,27 @@ void main() {
     },
   );
 
+  test('las formas no cuentan ni salen en el catálogo', () async {
+    await upsertBulbasaur(db);
+    await db.catalogDao.upsertPokemon(
+      PokemonsCompanion.insert(
+        id: const Value(10033),
+        speciesId: 1,
+        name: 'venusaur-mega',
+        isDefault: const Value(false),
+        lightSyncedAt: DateTime(2026, 11, 3),
+      ),
+      types: const [],
+      stats: const [],
+      abilities: const [],
+    );
+
+    final listed = await db.catalogDao.watchPokemonWithTypes().first;
+
+    expect([for (final p in listed) p.pokemon.id], [1]);
+    expect(await db.catalogDao.countPokemon(), 1);
+  });
+
   test('upsertPokemon actualiza la fila existente', () async {
     await upsertBulbasaur(db);
     await db.catalogDao.upsertPokemon(

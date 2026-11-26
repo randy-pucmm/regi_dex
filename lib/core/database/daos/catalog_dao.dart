@@ -184,7 +184,7 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
 
   /// Condición de [criteria] sobre `pokemon`; verdadera si no pide nada.
   Expression<bool> _matches(CatalogCriteria criteria) {
-    Expression<bool> where = const Constant(true);
+    Expression<bool> where = pokemons.isDefault.equals(true);
     final number = criteria.number;
     if (number != null) where = where & pokemons.id.equals(number);
     final namePart = criteria.namePart;
@@ -254,9 +254,11 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   /// Cantidad de Pokémon del catálogo, como flujo.
   Stream<int> watchPokemonCount() {
     final count = pokemons.id.count();
-    return (selectOnly(
-      pokemons,
-    )..addColumns([count])).map((row) => row.read(count)!).watchSingle();
+    return (selectOnly(pokemons)
+          ..addColumns([count])
+          ..where(pokemons.isDefault.equals(true)))
+        .map((row) => row.read(count)!)
+        .watchSingle();
   }
 
   /// Cantidad de Pokémon del catálogo.

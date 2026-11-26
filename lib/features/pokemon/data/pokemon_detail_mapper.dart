@@ -87,6 +87,7 @@ PokemonDetailRecord mapPokemonDetail(
       id: Value(dto.id),
       speciesId: species.id,
       name: dto.name,
+      isDefault: Value(dto.isDefault),
       height: Value(dto.height),
       weight: Value(dto.weight),
       baseStatTotal: Value(dto.baseStatTotal),

@@ -9,6 +9,7 @@ class PokemonDetailDto {
   const PokemonDetailDto({
     required this.id,
     required this.name,
+    required this.isDefault,
     required this.height,
     required this.weight,
     required this.types,
@@ -35,6 +36,7 @@ class PokemonDetailDto {
     return PokemonDetailDto(
       id: reader.integer('id'),
       name: reader.string('name'),
+      isDefault: reader.boolean('is_default'),
       height: reader.integerOrNull('height') ?? 0,
       weight: reader.integerOrNull('weight') ?? 0,
       types: [
@@ -74,6 +76,7 @@ class PokemonDetailDto {
 
   final int id;
   final String name;
+  final bool isDefault;
   final int height;
   final int weight;
   final List<PokemonTypeSlotDto> types;
