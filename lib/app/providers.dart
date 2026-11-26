@@ -20,6 +20,7 @@ import '../features/pokemon/data/catalog_local_source.dart';
 import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/detail_sync.dart';
 import '../features/pokemon/data/image_sync.dart';
+import '../features/pokemon/data/integrity_checker.dart';
 import '../features/pokemon/data/pokemon_detail_repository_impl.dart';
 import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
@@ -180,6 +181,19 @@ final imageSyncProvider = Provider<ImageSync>(
   ),
 );
 
+/// Verificación de integridad del catálogo (OF-19..21): detecta filas
+/// alteradas en el dispositivo y las restaura desde PokéAPI.
+final integrityCheckerProvider = Provider<IntegrityChecker>(
+  (ref) => IntegrityChecker(
+    remote: ref.watch(pokemonRemoteSourceProvider),
+    local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
+    metadata: ref.watch(appDatabaseProvider).syncMetadataDao,
+    budget: ref.watch(apiBudgetProvider),
+    isOnline: () =>
+        ref.read(serviceStatusProvider).value?.status == ServiceStatus.online,
+  ),
+);
+
 /// Respaldo remoto de la búsqueda (una llamada, resultados a la base).
 final remoteSearchProvider = Provider<RemoteSearch>(
   (ref) => RemoteSearch(
@@ -269,10 +283,21 @@ final pokemonMovesProvider = FutureProvider.family<MovePage, MovesRequest>(
 );
 
 /// Descarga el detalle al abrir un Pokémon. Devuelve false si no se pudo: la
-/// pantalla sigue con lo local.
-final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>(
-  (ref, id) => ref
-      .watch(syncPokemonDetailProvider)(id)
-      .then((_) => true)
-      .onError<Failure>((_, _) => false),
-);
+/// pantalla sigue con lo local. Si el detalle estaba vigente y no hubo
+/// descarga, lo compara con el remoto sin esperar (OF-20); cuando sí se
+/// descargó, esa comparación ya la hizo la descarga.
+final pokemonDetailRefreshProvider = FutureProvider.family<bool, int>((
+  ref,
+  id,
+) async {
+  final wasFresh = await ref.read(detailSyncProvider).isFresh(id);
+  try {
+    await ref.watch(syncPokemonDetailProvider)(id);
+  } on Failure {
+    return false;
+  }
+  if (wasFresh && ref.mounted) {
+    unawaited(ref.read(integrityCheckerProvider).verifyPokemon(id));
+  }
+  return true;
+});

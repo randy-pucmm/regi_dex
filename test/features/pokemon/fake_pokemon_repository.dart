@@ -12,6 +12,9 @@ class FakePokemonRepository implements PokemonRepository {
   /// Ids pedidos con `syncDetail`, en orden.
   final detailRequests = <int>[];
 
+  /// Si no es null, `syncDetail()` lo lanza.
+  Object? detailError;
+
   /// Si no es null, `refresh()` lo lanza.
   Object? refreshError;
 
@@ -68,5 +71,7 @@ class FakePokemonRepository implements PokemonRepository {
   @override
   Future<void> syncDetail(int pokemonId) async {
     detailRequests.add(pokemonId);
+    final error = detailError;
+    if (error != null) throw error;
   }
 }
