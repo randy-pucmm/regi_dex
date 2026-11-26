@@ -27,6 +27,7 @@ class PokemonDetailPage extends ConsumerStatefulWidget {
 class _PokemonDetailPageState extends ConsumerState<PokemonDetailPage> {
   late var _formId = widget.id;
   var _shiny = false;
+  var _female = false;
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +66,10 @@ class _PokemonDetailPageState extends ConsumerState<PokemonDetailPage> {
               formId: _formId,
               missingForm: missingForm,
               shiny: _shiny,
+              female: _female,
               onForm: (formId) => setState(() => _formId = formId),
               onShiny: () => setState(() => _shiny = !_shiny),
+              onGender: () => setState(() => _female = !_female),
             ),
             AsyncData() => const _Notice(
               'Este Pokémon no está en el catálogo.',
@@ -88,8 +91,10 @@ class _Detail extends ConsumerWidget {
     required this.formId,
     required this.missingForm,
     required this.shiny,
+    required this.female,
     required this.onForm,
     required this.onShiny,
+    required this.onGender,
   });
 
   final int heroId;
@@ -98,8 +103,10 @@ class _Detail extends ConsumerWidget {
   final int formId;
   final bool missingForm;
   final bool shiny;
+  final bool female;
   final ValueChanged<int> onForm;
   final VoidCallback onShiny;
+  final VoidCallback onGender;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -111,6 +118,13 @@ class _Detail extends ConsumerWidget {
     final isFavorite =
         ref.watch(favoriteIdsProvider).value?.contains(heroId) ?? false;
     final artwork = pokemon.artworkUrl ?? pokemon.spriteUrl;
+    final art = detail.genderArt;
+    final shownFemale = female && art != null;
+    final image = art == null
+        ? (shiny ? detail.shinyUrl : null)
+        : shownFemale
+        ? (shiny ? art.femaleShiny : art.female)
+        : (shiny ? art.maleShiny : art.male);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
@@ -118,9 +132,13 @@ class _Detail extends ConsumerWidget {
           child: Hero(
             tag: PokemonImage.heroTag(heroId),
             child: PokemonImage(
-              url: shiny ? detail.shinyUrl ?? artwork : artwork,
+              url: image ?? artwork,
               size: 220,
-              label: shiny ? '$name shiny' : name,
+              label: [
+                name,
+                if (shownFemale) 'hembra',
+                if (shiny) 'shiny',
+              ].join(' '),
               cacheManager: ref.watch(imageCacheManagerProvider),
               plateColor: pokemon.types.isEmpty
                   ? null
@@ -152,6 +170,14 @@ class _Detail extends ConsumerWidget {
               selectedIcon: const Icon(Icons.auto_awesome),
               onPressed: detail.shinyUrl == null ? null : onShiny,
             ),
+            if (art != null)
+              IconButton(
+                tooltip: female ? 'Ver macho' : 'Ver hembra',
+                isSelected: female,
+                icon: const Icon(Icons.male),
+                selectedIcon: const Icon(Icons.female),
+                onPressed: onGender,
+              ),
             IconButton(
               tooltip: 'Compartir',
               icon: const Icon(Icons.share),

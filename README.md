@@ -32,7 +32,7 @@ Dónde está cada entregable del avance y cómo se comprueba.
 | # | Entregable | Dónde está | Cómo se comprueba |
 |---|---|---|---|
 | 1 | Estructura por funcionalidades con capas | `lib/features/<feature>/{presentation, domain, data}`, más `lib/core/` y `lib/ui/` (§6) | `test/architecture/layer_rules_test.dart` impone las reglas de dependencia entre capas |
-| 2 | Modelo de datos local | Drift v2 con 20 tablas: referencia, catálogo y detalle, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquemas en `drift_schemas/`) | `test/core/database/`, incluida la migración v1 a v2 |
+| 2 | Modelo de datos local | Drift v3 con 20 tablas: referencia, catálogo y detalle, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquemas en `drift_schemas/`) | `test/core/database/`, incluidas las migraciones hasta v3 |
 | 3 | GraphQL con paginación y sin duplicados | `CatalogSync`: lotes de 200 con upsert por clave primaria (`lib/features/pokemon/data/catalog_sync.dart`) | `catalog_sync_test.dart`: tres sincronizaciones seguidas dejan los mismos conteos (PA-13) e interrumpir y reanudar no pierde ni repite filas (PA-09). Corrida real contra PokéAPI el 7 de noviembre: 1025 Pokémon, y la segunda pasada con los mismos conteos |
 | 4 | Fuente de lectura local | `PokemonRepository` (contrato en `domain`) sobre Drift; la pantalla solo observa `catalogStateProvider` | `layer_rules_test.dart`: `presentation` no importa GraphQL, Drift ni DTOs; `pokemon_repository_test.dart` |
 | 5 | Interfaz sin bloqueos | `main()` solo hace `runApp`; la sync arranca sin esperarla (`catalogAutoSyncProvider`) y el mapeo de cada lote corre en un isolate | `catalog_auto_sync_test.dart` y `pokemon_mapper_test.dart` (paso por isolate) |
@@ -154,7 +154,7 @@ lib/
 ├── ui/                        # sistema de diseño Regi: tokens, temas, carcasa Pokédex, LED, chips y barras
 └── l10n/                      # app_es.arb · app_en.arb (planificado)
 test/                          # espejo de lib/, más test/architecture con las reglas de capas
-drift_schemas/                 # volcados del esquema de Drift (v1 y v2)
+drift_schemas/                 # volcados del esquema de Drift (v1 a v3)
 assets/fonts/                  # Chakra Petch y Figtree (licencia OFL)
 ```
 

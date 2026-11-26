@@ -95,6 +95,10 @@ PokemonDetailRecord mapPokemonDetail(
       artworkUrl: Value(dto.artworkUrl),
       spriteShinyUrl: Value(dto.spriteShinyUrl),
       artworkShinyUrl: Value(dto.artworkShinyUrl),
+      homeUrl: Value(dto.homeUrl),
+      homeShinyUrl: Value(dto.homeShinyUrl),
+      femaleUrl: Value(dto.femaleUrl),
+      femaleShinyUrl: Value(dto.femaleShinyUrl),
       contentHash: Value(hash),
       // El detalle trae todos los campos del catálogo ligero.
       lightSyncedAt: syncedAt,

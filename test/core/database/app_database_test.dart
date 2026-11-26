@@ -20,8 +20,8 @@ void main() {
     return [for (final row in rows) row.read<String>('name')];
   }
 
-  test('schemaVersion es 2', () {
-    expect(db.schemaVersion, 2);
+  test('schemaVersion es 3', () {
+    expect(db.schemaVersion, 3);
   });
 
   test('crea las tablas con los nombres del documento', () async {

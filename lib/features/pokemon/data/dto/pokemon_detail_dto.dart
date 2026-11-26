@@ -21,6 +21,10 @@ class PokemonDetailDto {
     this.spriteShinyUrl,
     this.artworkUrl,
     this.artworkShinyUrl,
+    this.homeUrl,
+    this.homeShinyUrl,
+    this.femaleUrl,
+    this.femaleShinyUrl,
   });
 
   /// Valida y convierte el `data` de GetPokemonDetail. Lanza [ValidationFailure]
@@ -71,6 +75,10 @@ class PokemonDetailDto {
       spriteShinyUrl: sprite?.stringOrNull('front_shiny'),
       artworkUrl: sprite?.stringOrNull('artwork'),
       artworkShinyUrl: sprite?.stringOrNull('artwork_shiny'),
+      homeUrl: sprite?.stringOrNull('home'),
+      homeShinyUrl: sprite?.stringOrNull('home_shiny'),
+      femaleUrl: sprite?.stringOrNull('female'),
+      femaleShinyUrl: sprite?.stringOrNull('female_shiny'),
     );
   }
 
@@ -88,6 +96,10 @@ class PokemonDetailDto {
   final String? spriteShinyUrl;
   final String? artworkUrl;
   final String? artworkShinyUrl;
+  final String? homeUrl;
+  final String? homeShinyUrl;
+  final String? femaleUrl;
+  final String? femaleShinyUrl;
 
   /// Suma de las estadísticas base.
   int get baseStatTotal => stats.fold(0, (sum, stat) => sum + stat.baseStat);

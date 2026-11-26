@@ -49,6 +49,14 @@ class PokemonDetailRepositoryImpl implements PokemonDetailRepository {
                     : titleCase(f.formName!),
               ),
           ],
+          genderArt: rows.pokemon.femaleUrl == null
+              ? null
+              : (
+                  male: rows.pokemon.homeUrl,
+                  maleShiny: rows.pokemon.homeShinyUrl,
+                  female: rows.pokemon.femaleUrl!,
+                  femaleShiny: rows.pokemon.femaleShinyUrl,
+                ),
         );
       });
 

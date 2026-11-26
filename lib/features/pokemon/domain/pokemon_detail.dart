@@ -47,6 +47,14 @@ class PokemonFormRef {
   bool get isCostume => _costume.hasMatch(label);
 }
 
+/// Imágenes de las especies cuyo aspecto cambia según el género.
+typedef GenderArt = ({
+  String? male,
+  String? maleShiny,
+  String female,
+  String? femaleShiny,
+});
+
 /// Detalle de un Pokémon. [stats] y [abilities] quedan vacías hasta que se
 /// descarga el detalle; [height] va en decímetros y [weight] en hectogramos.
 class PokemonDetail {
@@ -60,6 +68,7 @@ class PokemonDetail {
     this.shinyUrl,
     this.eggGroups = const [],
     this.forms = const [],
+    this.genderArt,
   });
 
   /// Lo que ya se sabe desde el catálogo mientras se lee la base.
@@ -71,7 +80,8 @@ class PokemonDetail {
       speciesId = null,
       shinyUrl = null,
       eggGroups = const [],
-      forms = const [];
+      forms = const [],
+      genderArt = null;
 
   final Pokemon pokemon;
   final int height;
@@ -86,4 +96,5 @@ class PokemonDetail {
   final String? shinyUrl;
   final List<String> eggGroups;
   final List<PokemonFormRef> forms;
+  final GenderArt? genderArt;
 }

@@ -18,6 +18,7 @@ import '../../../helpers/ui_test_helpers.dart';
 PokemonDetail _detail({
   Map<int, int> stats = const {},
   List<PokemonFormRef> forms = const [],
+  GenderArt? genderArt,
 }) => PokemonDetail(
   pokemon: const Pokemon(
     id: 1,
@@ -30,6 +31,7 @@ PokemonDetail _detail({
   shinyUrl: 'https://example.test/shiny.png',
   eggGroups: const ['monstruo', 'planta'],
   forms: forms,
+  genderArt: genderArt,
   stats: stats,
   abilities: const [
     PokemonAbilityRef(name: 'overgrow', isHidden: false, shortEffect: 'Sube.'),
@@ -113,6 +115,35 @@ void main() {
     await tester.pump();
 
     expect(find.byTooltip('Ver color normal'), findsOneWidget);
+  });
+
+  testWidgets('el botón de género solo sale si cambia el aspecto', (
+    tester,
+  ) async {
+    await _open(tester, Stream.value(_detail()));
+
+    expect(find.byTooltip('Ver hembra'), findsNothing);
+  });
+
+  testWidgets('alterna entre macho y hembra', (tester) async {
+    await _open(
+      tester,
+      Stream.value(
+        _detail(
+          genderArt: (
+            male: 'https://example.test/m.png',
+            maleShiny: null,
+            female: 'https://example.test/f.png',
+            femaleShiny: null,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Ver hembra'));
+    await tester.pump();
+
+    expect(find.byTooltip('Ver macho'), findsOneWidget);
   });
 
   testWidgets('compartir envía nombre, número y tipos', (tester) async {
