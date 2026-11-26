@@ -76,7 +76,7 @@ void main() {
 
       expect(find.text('ATAQUE'), findsOneWidget);
       expect(find.text('75'), findsOneWidget);
-      expect(find.bySemanticsLabel('ATAQUE: 75 de 255'), findsOneWidget);
+      expect(find.bySemanticsLabel('ATAQUE: 75 de 255, 29 %'), findsOneWidget);
       handle.dispose();
     });
 
