@@ -66,18 +66,6 @@ class ImagePrefetcher {
     this.maxConsecutiveFailures = 10,
   });
 
-  /// Prefetcher sobre la caché de disco [cache].
-  factory ImagePrefetcher.forCache(
-    BaseCacheManager cache, {
-    int concurrency = 6,
-    int maxConsecutiveFailures = 10,
-  }) => ImagePrefetcher(
-    isCached: (url) async => await cache.getFileFromCache(url) != null,
-    download: (url) => cache.getSingleFile(url),
-    concurrency: concurrency,
-    maxConsecutiveFailures: maxConsecutiveFailures,
-  );
-
   final Future<bool> Function(String url) _isCached;
   final Future<void> Function(String url) _download;
   final int concurrency;
