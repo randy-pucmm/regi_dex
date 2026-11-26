@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,9 +30,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.pokemonPattern,
-            builder: (context, state) => PokemonDetailPage(
-              id: int.parse(state.pathParameters['id']!),
-              preview: state.extra as Pokemon?,
+            // go_router 18 no reconoce el MaterialApp de Flutter y usa páginas
+            // sin transición, con las que el Hero no se anima.
+            pageBuilder: (context, state) => MaterialPage<void>(
+              key: state.pageKey,
+              child: PokemonDetailPage(
+                id: int.parse(state.pathParameters['id']!),
+                preview: state.extra as Pokemon?,
+              ),
             ),
           ),
           GoRoute(
