@@ -262,6 +262,16 @@ class CatalogDao extends DatabaseAccessor<AppDatabase> with _$CatalogDaoMixin {
   /// Cantidad de Pokémon del catálogo.
   Future<int> countPokemon() => watchPokemonCount().first;
 
+  /// URL de los sprites de la lista, por número nacional y sin repetir.
+  Future<List<String>> spriteUrls() async {
+    final query = selectOnly(pokemons)
+      ..addColumns([pokemons.spriteUrl])
+      ..where(pokemons.spriteUrl.isNotNull())
+      ..orderBy([OrderingTerm.asc(pokemons.id)]);
+    final rows = await query.map((r) => r.read(pokemons.spriteUrl)!).get();
+    return rows.toSet().toList();
+  }
+
   /// Pokémon por id, o null si no está en el catálogo.
   Future<PokemonRow?> getPokemon(int id) =>
       (select(pokemons)..where((p) => p.id.equals(id))).getSingleOrNull();
