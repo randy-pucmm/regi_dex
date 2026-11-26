@@ -29,7 +29,7 @@ class PokemonTile extends StatelessWidget {
     final kinds = types.isEmpty
         ? ''
         : ', ${types.length == 1 ? 'tipo' : 'tipos'} ${types.join(' y ')}';
-    void open() => context.push(AppRoutes.pokemon(pokemon.id));
+    void open() => context.push(AppRoutes.pokemon(pokemon.id), extra: pokemon);
 
     return Semantics(
       label: '$name, número ${pokemon.id}$kinds',
@@ -52,13 +52,16 @@ class PokemonTile extends StatelessWidget {
             child: Row(
               spacing: 12,
               children: [
-                PokemonImage(
-                  url: pokemon.spriteUrl,
-                  size: 56,
-                  cacheManager: cacheManager,
-                  plateColor: pokemon.types.isEmpty
-                      ? null
-                      : RegiTypeColors.of(pokemon.types.first.name),
+                Hero(
+                  tag: PokemonImage.heroTag(pokemon.id),
+                  child: PokemonImage(
+                    url: pokemon.spriteUrl,
+                    size: 56,
+                    cacheManager: cacheManager,
+                    plateColor: pokemon.types.isEmpty
+                        ? null
+                        : RegiTypeColors.of(pokemon.types.first.name),
+                  ),
                 ),
                 Expanded(
                   child: Column(

@@ -9,6 +9,7 @@ class PokemonDetailDto {
   const PokemonDetailDto({
     required this.id,
     required this.name,
+    required this.isDefault,
     required this.height,
     required this.weight,
     required this.types,
@@ -20,6 +21,10 @@ class PokemonDetailDto {
     this.spriteShinyUrl,
     this.artworkUrl,
     this.artworkShinyUrl,
+    this.homeUrl,
+    this.homeShinyUrl,
+    this.femaleUrl,
+    this.femaleShinyUrl,
   });
 
   /// Valida y convierte el `data` de GetPokemonDetail. Lanza [ValidationFailure]
@@ -35,6 +40,7 @@ class PokemonDetailDto {
     return PokemonDetailDto(
       id: reader.integer('id'),
       name: reader.string('name'),
+      isDefault: reader.boolean('is_default'),
       height: reader.integerOrNull('height') ?? 0,
       weight: reader.integerOrNull('weight') ?? 0,
       types: [
@@ -69,11 +75,16 @@ class PokemonDetailDto {
       spriteShinyUrl: sprite?.stringOrNull('front_shiny'),
       artworkUrl: sprite?.stringOrNull('artwork'),
       artworkShinyUrl: sprite?.stringOrNull('artwork_shiny'),
+      homeUrl: sprite?.stringOrNull('home'),
+      homeShinyUrl: sprite?.stringOrNull('home_shiny'),
+      femaleUrl: sprite?.stringOrNull('female'),
+      femaleShinyUrl: sprite?.stringOrNull('female_shiny'),
     );
   }
 
   final int id;
   final String name;
+  final bool isDefault;
   final int height;
   final int weight;
   final List<PokemonTypeSlotDto> types;
@@ -85,6 +96,10 @@ class PokemonDetailDto {
   final String? spriteShinyUrl;
   final String? artworkUrl;
   final String? artworkShinyUrl;
+  final String? homeUrl;
+  final String? homeShinyUrl;
+  final String? femaleUrl;
+  final String? femaleShinyUrl;
 
   /// Suma de las estadísticas base.
   int get baseStatTotal => stats.fold(0, (sum, stat) => sum + stat.baseStat);

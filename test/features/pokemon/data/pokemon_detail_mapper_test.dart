@@ -16,6 +16,8 @@ void main() {
       expect(record.pokemon.speciesId.value, 7);
       expect(record.pokemon.spriteShinyUrl.value, 'https://img.test/s/7.png');
       expect(record.pokemon.artworkShinyUrl.value, 'https://img.test/as/7.png');
+      expect(record.pokemon.femaleUrl.value, 'https://img.test/f/7.png');
+      expect(record.pokemon.homeUrl.value, isNull);
       expect(record.pokemon.detailSyncedAt.value, _syncedAt);
       expect(record.pokemon.lightSyncedAt.value, _syncedAt);
       expect(record.species.nameEs.value, 'Especie 7');

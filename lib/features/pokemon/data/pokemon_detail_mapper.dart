@@ -87,6 +87,7 @@ PokemonDetailRecord mapPokemonDetail(
       id: Value(dto.id),
       speciesId: species.id,
       name: dto.name,
+      isDefault: Value(dto.isDefault),
       height: Value(dto.height),
       weight: Value(dto.weight),
       baseStatTotal: Value(dto.baseStatTotal),
@@ -94,6 +95,10 @@ PokemonDetailRecord mapPokemonDetail(
       artworkUrl: Value(dto.artworkUrl),
       spriteShinyUrl: Value(dto.spriteShinyUrl),
       artworkShinyUrl: Value(dto.artworkShinyUrl),
+      homeUrl: Value(dto.homeUrl),
+      homeShinyUrl: Value(dto.homeShinyUrl),
+      femaleUrl: Value(dto.femaleUrl),
+      femaleShinyUrl: Value(dto.femaleShinyUrl),
       contentHash: Value(hash),
       // El detalle trae todos los campos del catálogo ligero.
       lightSyncedAt: syncedAt,

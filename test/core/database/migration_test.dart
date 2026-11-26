@@ -10,7 +10,7 @@ void main() {
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
   test(
-    'de v1 a v2 el esquema queda igual al actual y conserva los datos',
+    'de v1 a v3 el esquema queda igual al actual y conserva los datos',
     () async {
       final schema = await verifier.schemaAt(1);
       schema.rawDatabase
@@ -26,7 +26,7 @@ void main() {
         );
 
       final db = AppDatabase(schema.newConnection());
-      await verifier.migrateAndValidate(db, 2);
+      await verifier.migrateAndValidate(db, 3);
 
       final row = await db.catalogDao.getPokemon(1);
       expect(row?.name, 'bulbasaur');
@@ -37,4 +37,25 @@ void main() {
       await db.close();
     },
   );
+
+  test('de v2 a v3 pide de nuevo los detalles guardados', () async {
+    final schema = await verifier.schemaAt(2);
+    schema.rawDatabase
+      ..execute("INSERT INTO generation (id, name) VALUES (1, 'generation-i')")
+      ..execute(
+        "INSERT INTO species (id, name, generation_id) VALUES (1, 'bulbasaur', 1)",
+      )
+      ..execute(
+        'INSERT INTO pokemon (id, species_id, name, light_synced_at, detail_synced_at) '
+        "VALUES (1, 1, 'bulbasaur', 1762164000, 1762164000)",
+      );
+
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 3);
+
+    final row = await db.catalogDao.getPokemon(1);
+    expect(row?.detailSyncedAt, isNull);
+    expect(row?.femaleUrl, isNull);
+    await db.close();
+  });
 }

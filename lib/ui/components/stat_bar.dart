@@ -20,12 +20,14 @@ class StatBar extends StatelessWidget {
 
   double get fraction => max <= 0 ? 0 : (value / max).clamp(0.0, 1.0);
 
+  int get percent => (fraction * 100).round();
+
   @override
   Widget build(BuildContext context) {
     final regi = RegiTheme.of(context);
     final text = Theme.of(context).textTheme;
     return Semantics(
-      label: '${stat.label}: $value de $max',
+      label: '${stat.label}: $value de $max, $percent %',
       excludeSemantics: true,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -40,6 +42,10 @@ class StatBar extends StatelessWidget {
           Text(
             '$value',
             style: text.headlineMedium?.copyWith(color: regi.onShell),
+          ),
+          Text(
+            '$percent %',
+            style: text.labelSmall?.copyWith(color: regi.onShellMuted),
           ),
           const SizedBox(height: 2),
           ClipRRect(

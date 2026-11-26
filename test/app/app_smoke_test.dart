@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/app.dart';
 import 'package:regi_dex/app/providers.dart';
+import 'package:regi_dex/app/router.dart';
 import 'package:regi_dex/app/shell_status.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/database/app_database.dart';
@@ -12,6 +13,7 @@ import 'package:regi_dex/core/error/failure.dart';
 import 'package:regi_dex/core/sync/sync_status.dart';
 import 'package:regi_dex/features/favorites/presentation/favorites_page.dart';
 import 'package:regi_dex/features/pokemon/presentation/catalog_page.dart';
+import 'package:regi_dex/features/pokemon/presentation/pokemon_detail_page.dart';
 import 'package:regi_dex/features/settings/presentation/settings_dialog.dart';
 import 'package:regi_dex/features/team_builder/presentation/team_builder_page.dart';
 import 'package:regi_dex/features/trivia/presentation/trivia_page.dart';
@@ -104,6 +106,25 @@ Finder _checkIn(String label) => find.descendant(
 );
 
 void main() {
+  testWidgets('el detalle entra con transición, para que el Hero se anime', (
+    tester,
+  ) async {
+    await _pumpApp(tester);
+    ProviderScope.containerOf(tester.element(find.byType(RegiDexApp)))
+        .read(routerProvider)
+        .push('/pokemon/1');
+    await tester.pump();
+    await tester.pump();
+
+    final detail = tester.element(find.byType(PokemonDetailPage));
+    expect(
+      (ModalRoute.of(detail)! as TransitionRoute).transitionDuration,
+      greaterThan(Duration.zero),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('abre en Inicio con los cinco destinos', (tester) async {
     await _pumpApp(tester);
 

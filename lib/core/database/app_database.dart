@@ -55,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'regidex'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +76,15 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(pokemonForms);
         await m.createIndex(idxEvolutionChainId);
         await m.createIndex(idxPokemonFormSpeciesId);
+      }
+      if (from < 3) {
+        // v3: imágenes por género.
+        await m.addColumn(pokemons, pokemons.homeUrl);
+        await m.addColumn(pokemons, pokemons.homeShinyUrl);
+        await m.addColumn(pokemons, pokemons.femaleUrl);
+        await m.addColumn(pokemons, pokemons.femaleShinyUrl);
+        // Los detalles ya guardados se vuelven a pedir al abrirlos.
+        await customStatement('UPDATE pokemon SET detail_synced_at = NULL');
       }
     },
     beforeOpen: (details) async {

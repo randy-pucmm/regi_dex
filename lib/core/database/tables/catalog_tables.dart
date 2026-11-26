@@ -57,6 +57,11 @@ class Pokemons extends Table {
   TextColumn get artworkUrl => text().nullable()();
   TextColumn get spriteShinyUrl => text().nullable()();
   TextColumn get artworkShinyUrl => text().nullable()();
+  // Renders de HOME: el arte oficial no tiene versión hembra.
+  TextColumn get homeUrl => text().nullable()();
+  TextColumn get homeShinyUrl => text().nullable()();
+  TextColumn get femaleUrl => text().nullable()();
+  TextColumn get femaleShinyUrl => text().nullable()();
   TextColumn get contentHash => text().nullable()();
   DateTimeColumn get lightSyncedAt => dateTime()();
   DateTimeColumn get detailSyncedAt => dateTime().nullable()();

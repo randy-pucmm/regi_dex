@@ -182,6 +182,7 @@ Map<String, dynamic> syntheticDetail(int id) {
             'front_shiny': 'https://img.test/s/$id.png',
             'artwork': 'https://img.test/a/$id.png',
             'artwork_shiny': 'https://img.test/as/$id.png',
+            'female': 'https://img.test/f/$id.png',
           },
         ],
         'pokemonspecy': {

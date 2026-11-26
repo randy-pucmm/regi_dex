@@ -37,6 +37,10 @@ query GetPokemonDetail($id: Int!, $langs: [String!]!) {
       front_shiny: sprites(path: "front_shiny")
       artwork: sprites(path: "other['official-artwork'].front_default")
       artwork_shiny: sprites(path: "other['official-artwork'].front_shiny")
+      home: sprites(path: "other.home.front_default")
+      home_shiny: sprites(path: "other.home.front_shiny")
+      female: sprites(path: "other.home.front_female")
+      female_shiny: sprites(path: "other.home.front_shiny_female")
     }
     pokemonspecy {
       id
