@@ -4,12 +4,14 @@ import '../core/connectivity/service_status.dart';
 import '../core/sync/sync_retry_scheduler.dart';
 import '../features/pokemon/data/catalog_sync.dart';
 import '../features/pokemon/data/detail_sync.dart';
+import '../features/pokemon/data/image_sync.dart';
 import 'providers.dart';
 
-/// Claves de `sync_metadata` que se reintentan solas. La referencia no está:
-/// la vuelve a pedir el catálogo al reintentarse.
+/// Claves de `sync_metadata` que se reintentan solas: catálogo, imágenes y
+/// detalles. La referencia no está: la vuelve a pedir el catálogo.
 bool isRetryable(String resourceKey) =>
     resourceKey == CatalogSync.resourceKey ||
+    resourceKey == ImageSync.resourceKey ||
     resourceKey.startsWith(DetailSync.keyPrefix);
 
 /// Reintenta solas las sincronizaciones fallidas, con el backoff y el
@@ -18,7 +20,7 @@ bool isRetryable(String resourceKey) =>
 /// observarlo.
 final syncRetryProvider = Provider<void>((ref) {
   final scheduler = SyncRetryScheduler(
-    rows: ref.watch(appDatabaseProvider).syncMetadataDao.watchAll(),
+    rows: ref.watch(syncMetadataStreamProvider),
     isOnline: () =>
         ref.read(serviceStatusProvider).value?.status == ServiceStatus.online,
     retry: (key) => _retry(ref, key),
@@ -37,6 +39,8 @@ Future<void> _retry(Ref ref, String key) async {
   if (!ref.mounted) return;
   if (key == CatalogSync.resourceKey) {
     await ref.read(refreshCatalogProvider)();
+  } else if (key == ImageSync.resourceKey) {
+    await ref.read(imageSyncProvider).run();
   } else if (key.startsWith(DetailSync.keyPrefix)) {
     final id = int.tryParse(key.substring(DetailSync.keyPrefix.length));
     if (id != null) await ref.read(detailSyncProvider).sync(id, force: true);

@@ -36,6 +36,12 @@ void main() {
     ),
   );
 
+  /// El catálogo completo con las imágenes ya descargadas.
+  Future<void> completedCatalog(DateTime at) async {
+    await completed('images', at);
+    await completed('catalog', at);
+  }
+
   Future<DateTime?> lastSync() async {
     await pumpEventQueue();
     return container.read(lastSyncAtProvider).value;
@@ -50,13 +56,13 @@ void main() {
   });
 
   test('devuelve la última sync correcta del catálogo', () async {
-    await completed('catalog', _catalogAt);
+    await completedCatalog(_catalogAt);
 
     expect(await lastSync(), _catalogAt);
   });
 
   test('una sync más reciente de otro recurso no cuenta', () async {
-    await completed('catalog', _catalogAt);
+    await completedCatalog(_catalogAt);
     await completed('reference', _newerAt);
     await completed('detail:1', _newerAt);
 
@@ -70,7 +76,7 @@ void main() {
   });
 
   test('un intento fallido no cambia la hora del último éxito', () async {
-    await completed('catalog', _catalogAt);
+    await completedCatalog(_catalogAt);
     await db.syncMetadataDao.upsert(
       SyncMetadataEntriesCompanion.insert(
         resourceKey: 'catalog',
@@ -83,16 +89,16 @@ void main() {
   });
 
   test('se actualiza cuando el catálogo termina otra sync', () async {
-    await completed('catalog', _catalogAt);
+    await completedCatalog(_catalogAt);
     expect(await lastSync(), _catalogAt);
 
-    await completed('catalog', _newerAt);
+    await completedCatalog(_newerAt);
 
     expect(await lastSync(), _newerAt);
   });
 
   test('cambiar el recurso visible cambia la hora que se muestra', () async {
-    await completed('catalog', _catalogAt);
+    await completedCatalog(_catalogAt);
     await completed('champions', _newerAt);
     final other = ProviderContainer(
       overrides: [
@@ -106,5 +112,30 @@ void main() {
 
     expect(other.read(lastSyncAtProvider).value, _newerAt);
     expect(await lastSync(), _catalogAt);
+  });
+
+  group('primera sync: imágenes', () {
+    test('con el catálogo listo pero sin imágenes aún no hay hora', () async {
+      await completed('catalog', _catalogAt);
+
+      expect(await lastSync(), isNull);
+    });
+
+    test('al terminar las imágenes aparece la hora del catálogo', () async {
+      await completed('catalog', _catalogAt);
+      expect(await lastSync(), isNull);
+
+      await completed('images', _newerAt);
+
+      expect(await lastSync(), _catalogAt);
+    });
+
+    test('un refresco posterior del catálogo no vuelve a ocultarla', () async {
+      await completedCatalog(_catalogAt);
+
+      await completed('catalog', _newerAt);
+
+      expect(await lastSync(), _newerAt);
+    });
   });
 }

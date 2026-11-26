@@ -18,6 +18,7 @@ void main() {
   test('solo el catálogo y los detalles se reintentan solos', () {
     expect(isRetryable(CatalogSync.resourceKey), isTrue);
     expect(isRetryable('detail:25'), isTrue);
+    expect(isRetryable('images'), isTrue);
     expect(isRetryable(CatalogSync.referenceKey), isFalse);
     expect(isRetryable('champions'), isFalse);
   });

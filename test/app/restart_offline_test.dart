@@ -12,6 +12,7 @@ import 'package:regi_dex/core/connectivity/service_status.dart';
 import 'package:regi_dex/core/database/app_database.dart';
 import 'package:regi_dex/core/sync/sync_coordinator.dart';
 import 'package:regi_dex/features/pokemon/data/catalog_sync.dart';
+import 'package:regi_dex/features/pokemon/data/image_sync.dart';
 import 'package:regi_dex/ui/components/status_led.dart';
 import 'package:regi_dex/ui/tokens/led_state.dart';
 
@@ -37,6 +38,15 @@ void main() {
     late ProviderContainer container;
 
     /// Primera sesión: con red, descarga 5 Pokémon y cierra la app.
+    /// La primera sync solo se da por completa con las imágenes descargadas.
+    Future<void> markImagesDownloaded() => db.syncMetadataDao.upsert(
+      SyncMetadataEntriesCompanion.insert(
+        resourceKey: ImageSync.resourceKey,
+        status: SyncMetadataStatus.completed,
+        lastSuccessAt: Value(_lastSync),
+      ),
+    );
+
     Future<void> firstSession() async {
       final time = FakeTime()..now = _lastSync;
       final online = ProviderContainer(
@@ -50,6 +60,7 @@ void main() {
         ],
       );
       await time.run(() => online.read(refreshCatalogProvider)());
+      await markImagesDownloaded();
       online.dispose();
     }
 
@@ -135,6 +146,13 @@ void main() {
       await db.syncMetadataDao.upsert(
         SyncMetadataEntriesCompanion.insert(
           resourceKey: CatalogSync.resourceKey,
+          status: SyncMetadataStatus.completed,
+          lastSuccessAt: Value(_lastSync),
+        ),
+      );
+      await db.syncMetadataDao.upsert(
+        SyncMetadataEntriesCompanion.insert(
+          resourceKey: ImageSync.resourceKey,
           status: SyncMetadataStatus.completed,
           lastSuccessAt: Value(_lastSync),
         ),
