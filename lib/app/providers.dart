@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/io_client.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/connectivity/budgeted_health_checker.dart';
@@ -11,6 +13,7 @@ import '../core/connectivity/service_status.dart';
 import '../core/database/app_database.dart';
 import '../core/error/failure.dart';
 import '../core/images/image_prefetcher.dart';
+import '../core/network/champions_config.dart';
 import '../core/network/operation_loader.dart';
 import '../core/network/poke_api_client.dart';
 import '../core/network/poke_api_config.dart';
@@ -36,6 +39,11 @@ import '../features/pokemon/domain/search_pokemon_remote.dart';
 import '../features/pokemon/domain/sync_pokemon_detail.dart';
 import '../features/pokemon/domain/type_chart.dart';
 import '../features/pokemon/domain/watch_pokemon.dart';
+import '../features/team_builder/data/champions_local_source.dart';
+import '../features/team_builder/data/champions_remote_source.dart';
+import '../features/team_builder/data/champions_repository_impl.dart';
+import '../features/team_builder/data/champions_sync.dart';
+import '../features/team_builder/domain/champions_repository.dart';
 import 'image_providers.dart';
 
 /// Base de datos local, única para toda la app. Las pruebas la sobrescriben
@@ -152,6 +160,52 @@ final detailSyncProvider = Provider<DetailSync>(
     remote: ref.watch(pokemonRemoteSourceProvider),
     local: CatalogLocalSource(ref.watch(appDatabaseProvider)),
     coordinator: ref.watch(syncCoordinatorProvider),
+  ),
+);
+
+/// Raíz de Champions Battle Data. Se cambia con
+/// `--dart-define=CHAMPIONS_ENDPOINT=...` o sobrescribiendo el provider.
+final championsEndpointProvider = Provider<Uri>(
+  (ref) => Uri.parse(
+    const String.fromEnvironment(
+      'CHAMPIONS_ENDPOINT',
+      defaultValue: defaultChampionsEndpoint,
+    ),
+  ),
+);
+
+/// Llamadas REST a Champions Battle Data (sin presupuesto: caché de 24 h).
+final championsRemoteSourceProvider = Provider<ChampionsRemoteSource>((ref) {
+  final client = IOClient(
+    HttpClient()..connectionTimeout = defaultConnectTimeout,
+  );
+  ref.onDispose(client.close);
+  return ChampionsRemoteSource(
+    endpoint: ref.watch(championsEndpointProvider),
+    client: client,
+  );
+});
+
+/// Caché local de Champions y su correspondencia con PokéAPI.
+final championsLocalSourceProvider = Provider<ChampionsLocalSource>(
+  (ref) => ChampionsLocalSource(ref.watch(appDatabaseProvider)),
+);
+
+/// Sincronización del índice de Champions. Se lanza al abrir el Team Builder,
+/// no al arrancar la app.
+final championsSyncProvider = Provider<ChampionsSync>(
+  (ref) => ChampionsSync(
+    remote: ref.watch(championsRemoteSourceProvider),
+    local: ref.watch(championsLocalSourceProvider),
+    coordinator: ref.watch(syncCoordinatorProvider),
+  ),
+);
+
+/// Datos de Champions para el Team Builder.
+final championsRepositoryProvider = Provider<ChampionsRepository>(
+  (ref) => ChampionsRepositoryImpl(
+    local: ref.watch(championsLocalSourceProvider),
+    sync: ref.watch(championsSyncProvider),
   ),
 );
 
