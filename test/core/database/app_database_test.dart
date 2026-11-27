@@ -20,8 +20,8 @@ void main() {
     return [for (final row in rows) row.read<String>('name')];
   }
 
-  test('schemaVersion es 3', () {
-    expect(db.schemaVersion, 3);
+  test('schemaVersion es 4', () {
+    expect(db.schemaVersion, 4);
   });
 
   test('crea las tablas con los nombres del documento', () async {
@@ -48,6 +48,10 @@ void main() {
         'user_preference',
         'sync_metadata',
         'api_call_log',
+        'champions_meta',
+        'champions_pokemon',
+        'champions_learnable_move',
+        'champions_usage',
       ]),
     );
   });
