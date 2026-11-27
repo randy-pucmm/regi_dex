@@ -32,7 +32,7 @@ Dónde está cada entregable del avance y cómo se comprueba.
 | # | Entregable | Dónde está | Cómo se comprueba |
 |---|---|---|---|
 | 1 | Estructura por funcionalidades con capas | `lib/features/<feature>/{presentation, domain, data}`, más `lib/core/` y `lib/ui/` (§6) | `test/architecture/layer_rules_test.dart` impone las reglas de dependencia entre capas |
-| 2 | Modelo de datos local | Drift v3 con 20 tablas: referencia, catálogo y detalle, favoritos, preferencias, `sync_metadata` y `api_call_log` (`lib/core/database/`; esquemas en `drift_schemas/`) | `test/core/database/`, incluidas las migraciones hasta v3 |
+| 2 | Modelo de datos local | Drift v4 con 24 tablas: referencia, catálogo y detalle, favoritos, preferencias, `sync_metadata`, `api_call_log` y la caché de Champions (`lib/core/database/`; esquemas en `drift_schemas/`) | `test/core/database/`, incluidas las migraciones hasta v4 |
 | 3 | GraphQL con paginación y sin duplicados | `CatalogSync`: lotes de 200 con upsert por clave primaria (`lib/features/pokemon/data/catalog_sync.dart`) | `catalog_sync_test.dart`: tres sincronizaciones seguidas dejan los mismos conteos (PA-13) e interrumpir y reanudar no pierde ni repite filas (PA-09). Corrida real contra PokéAPI el 7 de noviembre: 1025 Pokémon, y la segunda pasada con los mismos conteos |
 | 4 | Fuente de lectura local | `PokemonRepository` (contrato en `domain`) sobre Drift; la pantalla solo observa `catalogStateProvider` | `layer_rules_test.dart`: `presentation` no importa GraphQL, Drift ni DTOs; `pokemon_repository_test.dart` |
 | 5 | Interfaz sin bloqueos | `main()` solo hace `runApp`; la sync arranca sin esperarla (`catalogAutoSyncProvider`) y el mapeo de cada lote corre en un isolate | `catalog_auto_sync_test.dart` y `pokemon_mapper_test.dart` (paso por isolate) |
@@ -154,7 +154,7 @@ lib/
 ├── ui/                        # sistema de diseño Regi: tokens, temas, carcasa Pokédex, LED, chips y barras
 └── l10n/                      # app_es.arb · app_en.arb (planificado)
 test/                          # espejo de lib/, más test/architecture con las reglas de capas
-drift_schemas/                 # volcados del esquema de Drift (v1 a v3)
+drift_schemas/                 # volcados del esquema de Drift (v1 a v4)
 assets/fonts/                  # Chakra Petch y Figtree (licencia OFL)
 ```
 
@@ -214,6 +214,14 @@ Si algo falla se deshace solo el lote en curso y el siguiente intento reanuda de
 4. Dos aperturas simultáneas del mismo Pokémon comparten la misma llamada (*single-flight*).
 
 El esquema v2 agrega `pokemon_move`, `evolution` y `pokemon_form`, además de las columnas shiny de `pokemon`. La pantalla de detalle solo debe leer de la base.
+
+**Datos de Champions (RD-35).** El Team Builder lee de su propia caché (`champions_meta`, `champions_pokemon`, `champions_learnable_move` y `champions_usage`, esquema v4), así que funciona sin conexión.
+
+1. Al abrir el Team Builder, `ChampionsSync` mira si el índice se confirmó hace menos de **24 h**; si es así no hace ninguna llamada.
+2. Si falta o venció, pide `GET /api` (≈18 MB sin comprimir; no necesita clave) con un tiempo máximo de 20 s. Este servicio no publica un límite de llamadas, por eso **no pasa por el presupuesto de PokéAPI** y tampoco alimenta el indicador de conexión.
+3. Valida y reduce la respuesta en un isolate (≈0,7 s): descarta lo que no se usa y conserva Pokémon, tipos, habilidades, estadísticas de nivel 50 con 0 SP, imagen y movimientos aprendibles.
+4. Solo **reemplaza** los datos, en una transacción, si cambió el `dataVersion`; si es el mismo, renueva la fecha de confirmación. Un fallo (sin red, 429, 5xx o respuesta inválida) deja la caché anterior intacta.
+5. El servicio no trae el número de la Pokédex (`dex` llega nulo), así que la relación con PokéAPI se hace por **nombre normalizado** (`raichualola` ↔ `raichu-alola`) con una tabla corta de alias; también se relacionan los movimientos. Lo que no se pueda relacionar usa la imagen de Champions. Se contrasta además con el version group `champions` (id 32) de PokéAPI y las diferencias solo se anotan en el registro.
 
 **Búsqueda.** Se hace siempre sobre la base local, así que funciona sin conexión.
 
@@ -350,7 +358,7 @@ Aquí van completos los dos ADR que ya están implementados en el código del Av
 | [ADR-005](#adr-005--presupuesto-de-llamadas-a-pokéapi) | Presupuesto de llamadas a PokéAPI (≤ 90/h) | Randy | Implementado |
 | ADR-006 | Detección de alteraciones locales con hash de contenido | Randy | Parcial: el hash se calcula y se guarda; la verificación llega con RD-29 |
 | ADR-007 | Monitor de conectividad con health-check e histéresis | Randy | Implementado |
-| ADR-008 | Champions Battle Data como fuente secundaria | Randy | Planificado (RD-35) |
+| ADR-008 | Champions Battle Data como fuente secundaria | Randy | Parcial: índice y caché (RD-35); sugerencias y Showdown llegan con RD-37 |
 | ADR-009 | Sistema de diseño Regi sobre Material 3 | Rafael | Implementado |
 | ADR-010 | Simulador de caída de API e inspector de BD | Rafael | Planificado (RD-30) |
 | ADR-011 | Internacionalización con ARB (es/en) | Rafael | Planificado (RD-33) |
