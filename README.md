@@ -150,7 +150,7 @@ lib/
 │   │   ├── data/              # CatalogSync, fuente remota, DTOs, mapeo a filas, content_hash y repositorio
 │   │   └── presentation/      # catalog_page, catalog_state (estados sellados) y pokemon_tile
 │   ├── settings/              # ventana de Ajustes: tema y modo
-│   └── favorites · trivia · team_builder   # solo la pantalla provisional; llegan en la entrega final
+│   └── favorites · trivia · team_builder   # favoritos listo; el resto, pantalla provisional
 ├── ui/                        # sistema de diseño Regi: tokens, temas, carcasa Pokédex, LED, chips y barras
 └── l10n/                      # app_es.arb · app_en.arb (planificado)
 test/                          # espejo de lib/, más test/architecture con las reglas de capas
@@ -346,7 +346,7 @@ Aquí van completos los dos ADR que ya están implementados en el código del Av
 | [ADR-001](#adr-001--drift-sqlite-como-fuente-de-verdad-observable) | Drift (SQLite) como fuente de verdad observable | Randy | Implementado |
 | ADR-002 | Riverpod para estado e inyección de dependencias | Rafael | Implementado |
 | ADR-003 | Cliente `graphql` sin caché normalizada y DTOs propios | Randy | Implementado |
-| ADR-004 | Imágenes fuera de la base de datos (caché LRU y favoritos fijados) | Rafael | Parcial: la caché LRU; los favoritos fijados llegan con RD-25 |
+| ADR-004 | Imágenes fuera de la base de datos (caché LRU y favoritos fijados) | Rafael | Implementado |
 | [ADR-005](#adr-005--presupuesto-de-llamadas-a-pokéapi) | Presupuesto de llamadas a PokéAPI (≤ 90/h) | Randy | Implementado |
 | ADR-006 | Detección de alteraciones locales con hash de contenido | Randy | Parcial: el hash se calcula y se guarda; la verificación llega con RD-29 |
 | ADR-007 | Monitor de conectividad con health-check e histéresis | Randy | Implementado |
