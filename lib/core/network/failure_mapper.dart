@@ -106,6 +106,26 @@ Failure _fromHttpStatus(
   return ServiceUnavailableFailure(message, statusCode: status);
 }
 
+/// Traduce un estado HTTP no exitoso de una respuesta REST de [service] a un
+/// [Failure]: el 429 es el límite de llamadas y cualquier otro estado, que el
+/// servicio no es utilizable.
+Failure failureFromRestStatus(
+  int status,
+  Map<String, String> headers,
+  String service,
+) {
+  if (status == 429) {
+    return RateLimitFailure(
+      '$service limitó las llamadas (HTTP 429)',
+      retryAfter: _retryAfter(headers),
+    );
+  }
+  return ServiceUnavailableFailure(
+    '$service respondió HTTP $status',
+    statusCode: status,
+  );
+}
+
 /// Lee `Retry-After` en segundos y lo lleva al mínimo de [minRateLimitWait].
 Duration _retryAfter(Map<String, String> headers) {
   final seconds = int.tryParse(headers['retry-after'] ?? '');
