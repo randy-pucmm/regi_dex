@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../themes/regi_theme.dart';
 import '../tokens/regi_colors.dart';
+import 'haptic_tap.dart';
 import 'hexagon_border.dart';
 
 /// Botón hexagonal de destino de Inicio. Sin [onPressed] queda deshabilitado y
-/// en gris.
+/// en gris. Al tocarlo da un toque háptico leve.
 class HexButton extends StatelessWidget {
   const HexButton({
     super.key,
@@ -26,6 +27,7 @@ class HexButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final enabled = onPressed != null;
+    final onTap = hapticTap(onPressed);
     final tone = enabled ? color : RegiInk.onShellMuted;
     final shape = HexagonBorder(
       pointAxis: Axis.horizontal,
@@ -37,13 +39,13 @@ class HexButton extends StatelessWidget {
       enabled: enabled,
       label: label,
       excludeSemantics: true,
-      onTap: onPressed,
+      onTap: onTap,
       child: Material(
         color: RegiInk.shell,
         shape: shape,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onPressed,
+          onTap: onTap,
           customBorder: shape,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 52),
@@ -94,6 +96,7 @@ class HexIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final onTap = hapticTap(onPressed);
     final shape = HexagonBorder(
       pointAxis: Axis.horizontal,
       depth: 15,
@@ -103,13 +106,13 @@ class HexIconButton extends StatelessWidget {
       button: true,
       label: label,
       excludeSemantics: true,
-      onTap: onPressed,
+      onTap: onTap,
       // Material propio: el `Ink` pinta en el más cercano, que el fondo de
       // Inicio taparía.
       child: Material(
         type: MaterialType.transparency,
         child: InkResponse(
-          onTap: onPressed,
+          onTap: onTap,
           customBorder: shape,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 64, minHeight: 64),
@@ -188,11 +191,12 @@ class OctagonHubButton extends StatelessWidget {
       depth: plateHeight * .33,
       side: BorderSide(color: regi.frame, width: 2),
     );
+    final onTap = hapticTap(onPressed);
     return Semantics(
       button: true,
       label: label,
       excludeSemantics: true,
-      onTap: onPressed,
+      onTap: onTap,
       child: SizedBox.square(
         dimension: size,
         child: Material(
@@ -200,7 +204,7 @@ class OctagonHubButton extends StatelessWidget {
           shape: outer,
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: onPressed,
+            onTap: onTap,
             customBorder: outer,
             child: Padding(
               padding: const EdgeInsets.all(_outerWidth),

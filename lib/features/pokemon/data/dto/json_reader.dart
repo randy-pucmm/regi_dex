@@ -66,6 +66,18 @@ class JsonReader {
     _ => throw _invalid(key, 'una lista'),
   };
 
+  /// Lista obligatoria de textos.
+  List<String> strings(String key) => switch (json[key]) {
+    final List<dynamic> values => [
+      for (final (index, value) in values.indexed)
+        switch (value) {
+          final String item => item,
+          _ => throw _invalid('$key[$index]', 'un texto'),
+        },
+    ],
+    _ => throw _invalid(key, 'una lista'),
+  };
+
   /// Nombre en [language] dentro de la lista [key] de `{name, language: {name}}`,
   /// o null si no hay traducción.
   String? localizedName(String key, String language) =>

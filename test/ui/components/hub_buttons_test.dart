@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/ui/components/hub_buttons.dart';
 import 'package:regi_dex/ui/tokens/regi_colors.dart';
@@ -162,6 +163,73 @@ void main() {
         isSemantics(label: 'Catálogo', isButton: true, hasTapAction: true),
       );
       handle.dispose();
+    });
+  });
+
+  group('vibración leve al tocar', () {
+    late List<Object?> haptics;
+
+    setUp(() {
+      haptics = [];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'HapticFeedback.vibrate') {
+              haptics.add(call.arguments);
+            }
+            return null;
+          });
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    testWidgets('HexButton, HexIconButton y OctagonHubButton vibran una vez', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        regiHost(
+          Column(
+            children: [
+              HexButton(
+                label: 'Favoritos',
+                color: RegiHubColors.favorites,
+                onPressed: () {},
+              ),
+              HexIconButton(
+                icon: Icons.tune,
+                label: 'Ajustes',
+                labelColor: Colors.white,
+                onPressed: () {},
+              ),
+              OctagonHubButton(label: 'Catálogo', size: 150, onPressed: () {}),
+            ],
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(HexButton));
+      expect(haptics, ['HapticFeedbackType.lightImpact']);
+      await tester.tap(find.byType(HexIconButton));
+      expect(haptics, hasLength(2));
+      await tester.tap(find.byType(OctagonHubButton));
+      expect(haptics, hasLength(3));
+    });
+
+    testWidgets('un botón deshabilitado no vibra', (tester) async {
+      await tester.pumpWidget(
+        regiHost(
+          const HexButton(
+            label: 'Sincronizar ahora',
+            color: RegiHubColors.trivia,
+            onPressed: null,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(HexButton), warnIfMissed: false);
+      expect(haptics, isEmpty);
     });
   });
 }

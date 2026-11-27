@@ -3,11 +3,13 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 import 'daos/api_call_log_dao.dart';
 import 'daos/catalog_dao.dart';
+import 'daos/champions_dao.dart';
 import 'daos/favorite_dao.dart';
 import 'daos/preference_dao.dart';
 import 'daos/reference_dao.dart';
 import 'daos/sync_metadata_dao.dart';
 import 'tables/catalog_tables.dart';
+import 'tables/champions_tables.dart';
 import 'tables/reference_tables.dart';
 import 'tables/sync_tables.dart';
 import 'tables/user_tables.dart';
@@ -38,9 +40,14 @@ part 'app_database.g.dart';
     UserPreferences,
     SyncMetadataEntries,
     ApiCallLogs,
+    ChampionsMeta,
+    ChampionsPokemons,
+    ChampionsLearnableMoves,
+    ChampionsUsages,
   ],
   daos: [
     CatalogDao,
+    ChampionsDao,
     ReferenceDao,
     FavoriteDao,
     PreferenceDao,
@@ -55,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'regidex'));
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,6 +92,13 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(pokemons, pokemons.femaleShinyUrl);
         // Los detalles ya guardados se vuelven a pedir al abrirlos.
         await customStatement('UPDATE pokemon SET detail_synced_at = NULL');
+      }
+      if (from < 4) {
+        // v4 (RD-35): caché de Pokémon Champions Battle Data (D12).
+        await m.createTable(championsMeta);
+        await m.createTable(championsPokemons);
+        await m.createTable(championsLearnableMoves);
+        await m.createTable(championsUsages);
       }
     },
     beforeOpen: (details) async {
