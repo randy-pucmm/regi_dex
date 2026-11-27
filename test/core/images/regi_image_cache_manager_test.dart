@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:regi_dex/core/images/pinned_images.dart';
 import 'package:regi_dex/core/images/regi_image_cache_manager.dart';
 
 void main() {
@@ -68,6 +69,21 @@ void main() {
       expect(await isCached('c'), isTrue);
     },
   );
+
+  test('una imagen fijada se entrega sin red ni caché', () async {
+    final source = await File('${dir.path}/origen').writeAsString('png');
+    final pinned = PinnedImages(() async => Directory('${dir.path}/pinned'));
+    await pinned.keep({'https://sin.red/1.png'}, (_) async => source);
+    final offline = RegiImageCacheManager(
+      config: Config('regidex_images_pinned', maxNrOfCacheObjects: 10),
+      pinned: pinned,
+    );
+    addTearDown(offline.dispose);
+
+    final response = await offline.getImageFile('https://sin.red/1.png').first;
+
+    expect(await (response as FileInfo).file.readAsString(), 'png');
+  });
 
   test('si todo cabe no borra nada', () async {
     await put('a');
