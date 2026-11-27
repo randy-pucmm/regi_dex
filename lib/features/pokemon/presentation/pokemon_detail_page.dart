@@ -8,6 +8,7 @@ import '../../../ui/components/pokemon_image.dart';
 import '../../../ui/components/stat_bar.dart';
 import '../../../ui/components/type_chip.dart';
 import '../../../ui/tokens/regi_colors.dart';
+import '../../favorites/presentation/favorite_button.dart';
 import '../domain/pokemon.dart';
 import '../domain/pokemon_detail.dart';
 import 'pokemon_evolutions_section.dart';
@@ -115,8 +116,6 @@ class _Detail extends ConsumerWidget {
     final name = _capitalize(pokemon.name);
     final number =
         'N.º ${(detail.speciesId ?? pokemon.id).toString().padLeft(4, '0')}';
-    final isFavorite =
-        ref.watch(favoriteIdsProvider).value?.contains(heroId) ?? false;
     final artwork = pokemon.artworkUrl ?? pokemon.spriteUrl;
     // PokéAPI no lista movimientos de las Gigamax: usan los de la base.
     final hasMoves = ref
@@ -156,20 +155,7 @@ class _Detail extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton(
-              tooltip: isFavorite
-                  ? 'Quitar de favoritos'
-                  : 'Agregar a favoritos',
-              isSelected: isFavorite,
-              icon: const Icon(Icons.favorite_border),
-              selectedIcon: const Icon(Icons.favorite),
-              onPressed: () {
-                final favorites = ref.read(appDatabaseProvider).favoriteDao;
-                isFavorite
-                    ? favorites.removeFavorite(heroId)
-                    : favorites.addFavorite(heroId);
-              },
-            ),
+            FavoriteButton(pokemonId: heroId),
             IconButton(
               tooltip: shiny ? 'Ver color normal' : 'Ver shiny',
               isSelected: shiny,

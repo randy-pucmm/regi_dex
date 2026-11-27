@@ -27,6 +27,7 @@ import '../features/pokemon/data/pokemon_remote_source.dart';
 import '../features/pokemon/data/pokemon_repository_impl.dart';
 import '../features/pokemon/data/remote_search.dart';
 import '../features/pokemon/domain/evolution_chain.dart';
+import '../features/pokemon/domain/pokemon.dart';
 import '../features/pokemon/domain/pokemon_detail.dart';
 import '../features/pokemon/domain/pokemon_detail_repository.dart';
 import '../features/pokemon/domain/pokemon_move.dart';
@@ -255,6 +256,19 @@ final pokemonEvolutionsProvider = StreamProvider.family<EvolutionChain?, int>(
 final favoriteIdsProvider = StreamProvider<Set<int>>(
   (ref) => ref.watch(appDatabaseProvider).favoriteDao.watchFavoriteIds(),
 );
+
+final _allPokemonProvider = StreamProvider<List<Pokemon>>(
+  (ref) => ref.watch(watchPokemonProvider)(),
+);
+
+/// Null mientras se leen los favoritos o el catálogo.
+final favoritePokemonProvider = Provider<List<Pokemon>?>((ref) {
+  final ids = ref.watch(favoriteIdsProvider).value;
+  final all = ref.watch(_allPokemonProvider).value;
+  if (ids == null || all == null) return null;
+  final byId = {for (final pokemon in all) pokemon.id: pokemon};
+  return [for (final id in ids) ?byId[id]];
+});
 
 /// Abre la hoja de compartir del sistema. Las pruebas lo sobrescriben.
 final shareTextProvider = Provider<Future<void> Function(String)>(

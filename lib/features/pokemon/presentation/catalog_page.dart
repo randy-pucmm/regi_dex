@@ -39,7 +39,7 @@ class CatalogPage extends ConsumerWidget {
           _AvailabilityNotice(availability: availability!),
         Expanded(
           child: switch (state) {
-            CatalogLoaded(:final pokemon) => _PokemonList(
+            CatalogLoaded(:final pokemon) => PokemonList(
               pokemon: pokemon,
               cacheManager: ref.watch(imageCacheManagerProvider),
             ),
@@ -261,8 +261,12 @@ class _AvailabilityNotice extends StatelessWidget {
   }
 }
 
-class _PokemonList extends StatelessWidget {
-  const _PokemonList({required this.pokemon, required this.cacheManager});
+class PokemonList extends StatelessWidget {
+  const PokemonList({
+    super.key,
+    required this.pokemon,
+    required this.cacheManager,
+  });
 
   final List<Pokemon> pokemon;
   final BaseCacheManager cacheManager;

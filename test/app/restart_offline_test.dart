@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:regi_dex/app/app.dart';
 import 'package:regi_dex/app/catalog_auto_sync.dart';
+import 'package:regi_dex/app/favorite_pins.dart';
 import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/app/shell_status.dart';
 import 'package:regi_dex/core/connectivity/service_status.dart';
@@ -161,6 +162,7 @@ void main() {
         ProviderScope(
           overrides: [
             appDatabaseProvider.overrideWithValue(db),
+            favoritePinsProvider.overrideWithValue(null),
             networkSourceProvider.overrideWithValue(
               FakeNetworkSource(NetworkKind.none),
             ),
