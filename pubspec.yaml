@@ -61,6 +61,10 @@ dependencies:
   crypto: 3.0.8
   share_plus: 13.3.1
 
+  # Imágenes de favoritos fijadas fuera de la caché (ADR-004).
+  path_provider: 2.1.6
+  file: 7.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

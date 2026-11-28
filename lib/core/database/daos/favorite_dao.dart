@@ -16,11 +16,9 @@ class FavoriteDao extends DatabaseAccessor<AppDatabase>
     favorites,
   )..orderBy([(f) => OrderingTerm.desc(f.createdAt)])).watch();
 
-  /// Ids de los Pokémon favoritos.
+  /// Ids de los Pokémon favoritos, el más reciente primero.
   Stream<Set<int>> watchFavoriteIds() =>
-      select(favorites)
-          .watch()
-          .map((rows) => {for (final row in rows) row.pokemonId});
+      watchFavorites().map((rows) => {for (final row in rows) row.pokemonId});
 
   /// Indica si [pokemonId] es favorito.
   Future<bool> isFavorite(int pokemonId) async =>

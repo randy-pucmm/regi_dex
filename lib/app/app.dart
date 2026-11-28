@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/settings/presentation/appearance_controller.dart';
 import '../ui/themes/regi_themes.dart';
 import 'catalog_auto_sync.dart';
+import 'favorite_pins.dart';
 import 'image_auto_sync.dart';
 import 'integrity_auto_sync.dart';
 import 'providers.dart';
@@ -25,6 +26,7 @@ class RegiDexApp extends ConsumerWidget {
     ref.watch(imageAutoSyncProvider);
     ref.watch(integrityAutoSyncProvider);
     ref.watch(syncRetryProvider);
+    ref.watch(favoritePinsProvider);
     final appearance = ref.watch(appearanceProvider);
     return MaterialApp.router(
       title: 'RegiDex',

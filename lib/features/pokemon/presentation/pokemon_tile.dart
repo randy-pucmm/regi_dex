@@ -7,6 +7,7 @@ import '../../../ui/components/hexagon_border.dart';
 import '../../../ui/components/pokemon_image.dart';
 import '../../../ui/components/type_chip.dart';
 import '../../../ui/tokens/regi_colors.dart';
+import '../../favorites/presentation/favorite_button.dart';
 import '../domain/pokemon.dart';
 
 class PokemonTile extends StatelessWidget {
@@ -20,6 +21,7 @@ class PokemonTile extends StatelessWidget {
   final BaseCacheManager cacheManager;
 
   static const _depth = 18.0;
+  static const _favoriteWidth = 48.0;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +33,7 @@ class PokemonTile extends StatelessWidget {
         : ', ${types.length == 1 ? 'tipo' : 'tipos'} ${types.join(' y ')}';
     void open() => context.push(AppRoutes.pokemon(pokemon.id), extra: pokemon);
 
-    return Semantics(
+    final tile = Semantics(
       label: '$name, número ${pokemon.id}$kinds',
       button: true,
       excludeSemantics: true,
@@ -48,7 +50,12 @@ class PokemonTile extends StatelessWidget {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(_depth + 4, 8, _depth + 4, 8),
+            padding: const EdgeInsets.fromLTRB(
+              _depth + 4,
+              8,
+              _depth + _favoriteWidth,
+              8,
+            ),
             child: Row(
               spacing: 12,
               children: [
@@ -106,6 +113,23 @@ class PokemonTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+    // Fuera del nodo de la ficha, para que el lector llegue al corazón.
+    return Stack(
+      children: [
+        tile,
+        Positioned(
+          right: _depth,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: FavoriteButton(
+              pokemonId: pokemon.id,
+              color: RegiInk.onShell,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

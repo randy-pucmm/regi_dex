@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:regi_dex/app/providers.dart';
 import 'package:regi_dex/features/pokemon/domain/pokemon.dart';
 import 'package:regi_dex/features/pokemon/presentation/pokemon_tile.dart';
 import 'package:regi_dex/ui/components/pokemon_image.dart';
@@ -18,12 +20,17 @@ const _regirock = Pokemon(
 );
 
 Widget _tile(Pokemon pokemon, {double width = 400, double textScale = 1}) =>
-    regiHost(
-      SizedBox(
-        width: width,
-        child: PokemonTile(pokemon: pokemon, cacheManager: FakeImageCache()),
+    ProviderScope(
+      overrides: [
+        favoriteIdsProvider.overrideWith((ref) => Stream.value(const {})),
+      ],
+      child: regiHost(
+        SizedBox(
+          width: width,
+          child: PokemonTile(pokemon: pokemon, cacheManager: FakeImageCache()),
+        ),
+        textScale: textScale,
       ),
-      textScale: textScale,
     );
 
 void main() {

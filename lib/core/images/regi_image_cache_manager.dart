@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:file/local.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import 'image_cache_policy.dart';
+import 'pinned_images.dart';
 
 /// Caché de imágenes en disco: LRU de 1500 archivos (lo hace la librería) y
 /// 150 MB (lo hace [trimToSize], porque la librería solo cuenta archivos).
@@ -12,6 +14,7 @@ import 'image_cache_policy.dart';
 class RegiImageCacheManager extends CacheManager with ImageCacheManager {
   RegiImageCacheManager({
     Config? config,
+    this.pinned,
     this._maxBytes = ImageCacheLimits.maxBytes,
     this._trimDelay = const Duration(seconds: 5),
   }) : super(
@@ -21,6 +24,7 @@ class RegiImageCacheManager extends CacheManager with ImageCacheManager {
 
   static const _cacheKey = 'regidex_images';
 
+  final PinnedImages? pinned;
   final int _maxBytes;
   final Duration _trimDelay;
   Timer? _trimTimer;
@@ -31,8 +35,18 @@ class RegiImageCacheManager extends CacheManager with ImageCacheManager {
     String? key,
     Map<String, String>? headers,
     bool withProgress = false,
-  }) {
-    return super
+  }) async* {
+    final copy = await pinned?.find(url);
+    if (copy != null) {
+      yield FileInfo(
+        const LocalFileSystem().file(copy.path),
+        FileSource.Cache,
+        DateTime.now(),
+        url,
+      );
+      return;
+    }
+    yield* super
         .getFileStream(
           url,
           key: key,

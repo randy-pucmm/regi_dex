@@ -52,10 +52,12 @@ class TypeChip extends StatelessWidget {
               Icon(Icons.check, size: 14, color: foreground),
               const SizedBox(width: 3),
             ],
-            Text(
-              label.toUpperCase(),
-              style: Theme.of(context).textTheme.labelMedium
-                  ?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                style: Theme.of(context).textTheme.labelMedium
+                    ?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
